@@ -9,7 +9,6 @@
     var osgUtil = OSG.osgUtil;
     var osgShader = OSG.osgShader;
     var $ = window.$;
-    var JSZip = window.JSZip;
     var Object = window.Object;
 
     var Environment = window.Environment;
@@ -293,40 +292,33 @@
         },
 
         loadZipFile: function(fileOrBlob, zipFileName) {
-            return JSZip.loadAsync(fileOrBlob).then(
-                function(zip) {
-                    var gltfFormat;
-                    var environmentFormat;
-                    Object.keys(zip.files).forEach(function(path) {
-                        var filename = path.split('/').pop();
-                        var ext = filename.split('.').pop();
-                        if (ext === 'gltf') gltfFormat = true;
-                        if (filename === 'config.json') environmentFormat = true;
+            var self = this;
+            return osgDB.FileHelper.unzipFile(fileOrBlob).then(function(filesMap) {
+                var gltfFile;
+                var environmentFormat;
+                filesMap.forEach(function(value, path) {
+                    var filename = path.split('/').pop();
+                    var ext = osgDB.FileHelper.getExtension(filename);
+                    if (ext === 'gltf') gltfFile = path;
+                    if (filename === 'config.json') environmentFormat = true;
+                });
+
+                if (gltfFile) {
+                    var gltfReader = osgDB.Registry.getReaderWriterForExtension('gltf');
+                    return gltfReader.readNodeURL(gltfFile, {filesMap: filesMap}).then(function(node) {
+                        return self.loadNode(node);
                     });
+                } else if (environmentFormat) {
+                    var name = zipFileName;
+                    return self.createEnvironment(zipFileName, name).then(function(env) {
+                        return self.setEnvironment(env.name);
+                    });
+                }
 
-                    if (gltfFormat) {
-                        var self = this;
-                        var filesMap = new window.Map();
-                        filesMap.set(zipFileName, fileOrBlob);
-                        osgDB
-                            .readNodeURL(zipFileName, {
-                                filesMap: filesMap
-                            })
-                            .then(function(node) {
-                                return self.loadNode(node);
-                            });
-                    } else if (environmentFormat) {
-                        var name = zipFileName;
-                        return this.createEnvironment(zip, name).then(
-                            function(env) {
-                                return this.setEnvironment(env.name);
-                            }.bind(this)
-                        );
-                    }
-
-                    return false;
-                }.bind(this)
-            );
+                return P.reject();
+            }).catch(function() {
+                osg.warn('cant unzip ' + zipFileName);
+            });
         },
 
         handleDroppedFiles: function(files) {
@@ -342,11 +334,13 @@
             ) {
                 return this.loadZipFile(files[0], files[0].name).then(function() {
                     $('#loading').hide();
+                }).catch(function() {
+                    osg.warn('cant load ' + files[0].name);
+                    $('#loading').hide();
                 });
             }
 
-            return osgDB.FileHelper
-                .readFileList(files)
+            return osgDB.FileHelper.readFileList(files)
                 .then(function(root) {
                     self.loadNode(root);
                 })
@@ -390,7 +384,10 @@
                             $('#loading').hide();
                         });
                     }.bind(this)
-                );
+                ).catch( function() {
+                    $('#loading').hide();
+                    osg.warn('cant load url ' + url);
+                });
         },
 
         loadFiles: function() {
