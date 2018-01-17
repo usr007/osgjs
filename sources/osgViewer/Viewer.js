@@ -529,6 +529,10 @@ utils.createPrototypeObject(
             return true;
         },
 
+        initInputManager: function () {
+            //this.setVrDisplay(InputManager.getInputSource('WebVR').getHmd())
+        },
+
         // intialize all input devices
         initEventProxy: function(argsObject) {
             var args = argsObject || {};

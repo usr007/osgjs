@@ -1,4 +1,4 @@
-var DeviceOrientation = function(viewer) {
+ var DeviceOrientation = function(viewer) {
     this._viewer = viewer;
     this._type = 'DeviceOrientation';
     this._enable = false;

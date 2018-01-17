@@ -51,7 +51,7 @@ GamePad.prototype = {
         }
         if (this._gamepadIndex >= 0) {
             this._gamepadIndex = -1;
-            this.onGamepadConnect();
+            this.onGamepadDisconnect();
         }
         return null;
     },
