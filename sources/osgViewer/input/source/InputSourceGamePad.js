@@ -1,6 +1,8 @@
 import utils from 'osg/utils';
 import InputSource from 'osgViewer/input/source/InputSource';
 
+var POLL_INTERVAL = 3000;
+
 /**
  * Game Pads input handling
  * @constructor
@@ -16,6 +18,8 @@ var InputSourceGamePad = function() {
         var event = new Event(eventName);
         this._events[eventName] = event;
     }
+    this._nbCallbacks = 0;
+    this._gamePad;
 };
 utils.createPrototypeObject(
     InputSourceGamePad,
@@ -32,33 +36,42 @@ utils.createPrototypeObject(
             }
             if (enable) {
                 callbacks.push(callback);
+                this._nbCallbacks ++;
             } else {
-                callbacks.splice(callbacks.indexof(callback), 1);
+                var removed = callbacks.splice(callbacks.indexof(callback), 1);
+                if(removed) this._nbCallbacks --;
             }
         },
 
         _gamepadPoll: function() {
             if (!navigator.getGamepads) return null;
-            var gamepads = navigator.getGamepads();
-            var gamepad = gamepads[this._gamepadIndex];
-            if (gamepad) return gamepad;
 
-
-            //selecting the last gamepad in the list as the current gamepad.
-            for (var i = 0, nb = gamepads.length; i < nb; ++i) {
-                var gm = gamepads[i];
-                // https://code.google.com/p/chromium/issues/detail?id=413805
-                if (gm && gm.id && gm.id.indexOf('Unknown Gamepad') === -1) {
-                    this._gamepadIndex = i;
-                    this._onConnectionStateChange(gm, 'ongamepadconnected');
-                    return gm;
+            setInterval(function () {
+                var gamepads = navigator.getGamepads();
+                var gamepad = gamepads[this._gamepadIndex];
+                if (gamepad) {
+                    this._gamePad = gamepad;
+                    return;
                 }
-            }
-            if (this._gamepadIndex >= 0) {
-                this._onConnectionStateChange(this._gamepadIndex, 'ongamepaddisconnected');
-                this._gamepadIndex = -1;
-            }
-            return null;
+
+                //selecting the first gamepad in the list as the current gamepad.
+                for (var i = 0, nb = gamepads.length; i < nb; ++i) {
+                    var gm = gamepads[i];
+                    // https://code.google.com/p/chromium/issues/detail?id=413805
+                    if (gm && gm.id && gm.id.indexOf('Unknown Gamepad') === -1) {
+                        this._gamepadIndex = i;
+                        this._onConnectionStateChange(gm, 'ongamepadconnected');
+                        this._gamePad = gm;
+                        return;
+                    }
+                }
+                if (this._gamepadIndex >= 0) {
+                    this._onConnectionStateChange(this._gamePad, 'ongamepaddisconnected');
+                    this._gamepadIndex = -1;
+                }
+                return null;
+            }, POLL_INTERVAL);
+
         },
 
         _onConnectionStateChange: function(gamepad, state){
@@ -84,7 +97,7 @@ utils.createPrototypeObject(
         },
         
         poll: function () {
-            var gamepad = this._gamepadPoll();
+            var gamepad = this._gamePad;
             if (!gamepad) return;
 
             var buttonPressedCallbacks = this._callbacks['buttonpressed'];

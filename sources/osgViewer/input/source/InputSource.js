@@ -1,4 +1,3 @@
-
 /**
  * Abstract InputSource
  * @param canvas
@@ -18,7 +17,7 @@ InputSource.prototype = {
             }
         }
         return false;
-    }
+    },
 
 };
 

@@ -25,8 +25,8 @@ import intersectionEnums from 'osgUtil/intersectionEnums';
  *  - Spacebar resets the view.
  */
 
-var CADManipulator = function() {
-    Manipulator.call(this);
+var CADManipulator = function(options) {
+    Manipulator.call(this, options);
     this._tmpHomePosition = vec3.create();
     this._intersectionVisitor = new IntersectionVisitor();
     this._lineSegmentIntersector = new LineSegmentIntersector();

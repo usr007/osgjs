@@ -19,9 +19,7 @@ var InputSourceMouse = function(canvas) {
         'mouseover',
         'mouseout',
         'mouseup',
-        'DOMMouseScroll',
-        'mousewheel',
-        'MozMousePixelScroll'
+        'wheel',
     ];
 };
 utils.createPrototypeObject(
@@ -33,14 +31,24 @@ utils.createPrototypeObject(
         },
 
         setEnable: function(name, callback, enable) {
-            // here we could parse the name of th event.
+            // here we could parse the name of the event.
             // if the name is for example 'click left', only dispatch the event if the left button has ben clicked.
             // This would remove a lot of boiler plate from client code.
 
             if (enable) {
                 this._target.addEventListener(name, callback);
+                if(name === 'wheel' ){
+                    this._target.addEventListener('mousewheel', callback);
+                    this._target.addEventListener('DOMMouseScroll', callback);
+                    this._target.addEventListener('MozMousePixelScroll', callback);
+                }
             } else {
                 this._target.removeEventListener(name, callback);
+                if(name === 'wheel' ){
+                    this._target.addEventListener('mousewheel', callback);
+                    this._target.removeEventListener('DOMMouseScroll', callback);
+                    this._target.removeEventListener('MozMousePixelScroll', callback);
+                }
             }
         },
 
@@ -72,17 +80,57 @@ utils.createPrototypeObject(
             customEvent.buttons = ev.buttons;
 
             if (this._isMouseWheelEvent(ev)) {
-                customEvent.wheelDelta = ev.wheelDelta === undefined ? -ev.detail : ev.wheelDelta;
+                if( ev.deltaMode !== undefined ) {
+                    customEvent.deltaMode = ev.deltaMode;
+                    customEvent.deltaY = ev.deltaY;
+                    customEvent.deltaX = ev.deltaX;
+                    customEvent.deltaZ = ev.deltaZ;
+                } else {
+                    customEvent.wheelDelta = ev.wheelDelta === undefined ? -ev.detail : ev.wheelDelta;
+                    customEvent.deltaMode = 0;
+                    customEvent.deltaY = -ev.wheelDelta / 3;
+                    customEvent.deltaX = 0;
+                    customEvent.deltaZ = 0;
+                }
             }
         },
 
         _isMouseWheelEvent(ev) {
             return (
+                ev.type === 'wheel' ||
                 ev.type === 'DOMMouseScroll' ||
                 ev.type === 'mousewheel' ||
                 ev.type === 'MozMousePixelScroll'
             );
+        },
+
+        matches: function(nativeEvent, parsedEvent) {
+            if (!parsedEvent.action){
+                return true;
+            }
+            if(nativeEvent.button !== parseInt(parsedEvent.action)) {
+                return false;
+            }
+            if(nativeEvent.ctrlKey !== !!parsedEvent.ctrl){
+                //console.log('ctrl no match');
+                return false;
+            }
+            if(nativeEvent.shiftKey !== !!parsedEvent.shift){
+                //console.log('shift no match');
+                return false;
+            }
+            if(nativeEvent.altKey !== !!parsedEvent.alt){
+                //console.log('alt no match');
+                return false;
+            }
+            if(nativeEvent.metaKey !== !!parsedEvent.meta){
+                //console.log('meta no match');
+                return false;
+            }
+
+            return true;
         }
+
     }),
     'osgViewer',
     'InputSourceMouse'

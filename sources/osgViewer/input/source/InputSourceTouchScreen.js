@@ -8,9 +8,8 @@ import Hammer from 'hammer';
  * @param hammer
  * @constructor
  */
-var InputSourceTouchScreen = function(canvas, hammer) {
+var InputSourceTouchScreen = function(canvas) {
     InputSource.call(this, canvas);
-    this._hammer = hammer;
 
     this._hammerEvents = [
         'pan',
@@ -25,7 +24,18 @@ var InputSourceTouchScreen = function(canvas, hammer) {
     ];
     this._supportedEvents = ['touchstart', 'touchend', 'touchcancel'];
 
-    hammer.add(
+    this._hammer = new Hammer.Manager(this._eventNode);
+
+    // defaults: { event: 'pan', pointers: 1, direction: Hammer.DIRECTION_HORIZONTAL, threshold: 10 }
+    this._hammer.add(new Hammer.Pan());
+
+    //This should be handled in the manipulator...
+    //if (options.getBoolean('scrollwheel')) {
+        //defaults: { event: 'pinch', pointers: 2, threshold: 0 }
+        this._hammer.add(new Hammer.Pinch());
+    //}
+
+    this._hammer.add(
         new Hammer.Tap({
             event: 'doubletap',
             pointers: 1,
@@ -37,7 +47,7 @@ var InputSourceTouchScreen = function(canvas, hammer) {
         })
     );
 
-    hammer.add(
+    this._hammer.add(
         new Hammer.Tap({
             event: 'doubletap2fingers',
             pointers: 2,
@@ -49,7 +59,7 @@ var InputSourceTouchScreen = function(canvas, hammer) {
         })
     );
 
-    hammer.add(
+    this._hammer.add(
         new Hammer.Tap({
             event: 'singletap',
             pointers: 1,

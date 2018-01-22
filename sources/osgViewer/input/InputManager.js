@@ -1,16 +1,30 @@
-
 var DEFAULT_PRIORITY = 3;
+var MODIFIERS = ['shift', 'alt', 'ctrl', 'meta'];
 
 /**
  * InputGroup
  * @constructor
  */
 var InputGroup = function(inputManager, name) {
+
+    // the name of the group
     this._name = name;
-    this._isEnabled = false;
+
+    // true when this group is enabled
+    this._isEnabled = true;
+
+    // reference to the inputManager
     this._inputManager = inputManager;
+
+    // Map of for custom event names to events instances
+    // { 'customEventName' : [event1, event2 ...]}
+    // there is one instance of event for each customEvent / nativeEvent combination
     this._events = {};
+
+    // Map for native event names to events instances.
     this._mappings = {};
+
+    // input sources that have to be polled on each frame. (not event based)
     this._pollableSources = [];
 };
 
@@ -26,6 +40,9 @@ InputGroup.prototype = {
         }
         for (var i = 0; i < events.length; i++) {
             var event = events[i];
+            if(event._source.matches && !event._source.matches(nativeEvent, event._parsedEvent)){
+                continue;
+            }
             event._source.populateEvent(nativeEvent, event);
             if (!event._nativeEvents) {
                 event._nativeEvents = [];
@@ -42,34 +59,46 @@ InputGroup.prototype = {
     },
 
     _addEvent: function(nativeEvent, eventName) {
-        var event = this._events[eventName];
-        if (!event) {
-            event = new Event(this._name + ':' + eventName);
-            event._priority = DEFAULT_PRIORITY;
-            this._events[eventName] = event;
+
+        // creating an event instance for each eventName / nativeEvent combination.
+        var event = new Event(this._name + ':' + eventName);
+        event._parsedEvent = nativeEvent;
+        event._priority = DEFAULT_PRIORITY;
+
+        // adding the new event to the events map
+        var eventList = this._events[eventName];
+        if(!eventList){
+            eventList = [];
         }
-        var events = this._mappings[nativeEvent];
+        eventList.push(event);
+        this._events[eventName] = eventList;
+
+        // adding the new event to the mappings map
+        var events = this._mappings[nativeEvent.name];
         if (!events) {
             events = [];
-            this._mappings[nativeEvent] = events;
-            var source = this._inputManager._getSource(name);
-            if (source) {
-                this._enableEventOnSource(nativeEvent, source);
-            }
+            this._mappings[nativeEvent.name] = events;
         }
         events.push(event);
+
+        // finding the source of the native event and enable the dispatch
+        var source = this._inputManager._getSource(nativeEvent.name);
+        if (source) {
+            this._enableEventOnSource(nativeEvent.name, source);
+            event._source = source;
+        }
+
     },
 
-    _enableEventOnSource: function(nativeEvent, source){
+    _enableEventOnSource: function(nativeEvent, source) {
         if (source.poll) {
             //pollable source
             this._pollableSources.push(source);
         }
-        event._inputSource = source;
         source.setEnable(nativeEvent, this._collectNativeEvents.bind(this), true);
     },
 
-    _poll: function () {
+    _poll: function() {
         for (var i = 0; i < this._pollableSources.length; i++) {
             var source = this._pollableSources[i];
             //poll will generate appropriate events.
@@ -81,16 +110,28 @@ InputGroup.prototype = {
 /**
  * InputManager
  */
-var InputManager = function () {
+var InputManager = function() {
+    // Contains all registered input sources.
     this._sources = {};
+
+    // Contains all created input groups
     this._groups = {};
+
+    // Event queues filled each frame with all the events to dispatch
+    // queues[0] = [event1, event2]
+    // queues[1] = [event3, event4]
+    // ...
+    // 0 is the top priority queue the higher the index the lowest the priority.
     this._queues = [];
+
+    // initializing the default priority queue
     this._queues[DEFAULT_PRIORITY] = [];
-}
+
+    // the map af callbacks
+    this._callbacks = {};
+};
 
 InputManager.prototype = {
-
-
     /**
      * See osgViewer/input/InputSource.js
      * @param source
@@ -103,27 +144,78 @@ InputManager.prototype = {
     },
 
     addMappings: function(mappings, listener) {
-        for (var eventName in mappings) {
-            var nativeEvents = mappings[eventName];
-            var groupEvent = eventName.split(':');
+        for (var key in mappings) {
+            var nativeEvents = mappings[key];
+            var groupEvent = key.split(':');
             if (groupEvent.length !== 2) {
                 throw "Mapping should be of the form 'group:methodName': ['nativeevent1’, 'nativeevent2',...] ";
             }
-
-            if (listener) {
-                window.addEventListener(eventName, listener[groupEvent[1]].bind(listener));
-            }
-
             var group = this._getOrCreateGroup(groupEvent[0]);
+
+            var callback;
+            var eventName = groupEvent[1];
+            if (listener) {
+                if (typeof listener === 'object') {
+                    callback = listener[eventName];
+                    if (!callback || typeof callback !== 'function') {
+                        throw 'Cannot find method ' + eventName + ' on ' + listener;
+                    }
+                    callback = callback.bind(listener);
+                } else if (typeof listener === 'function') {
+                    callback = listener;
+                } else {
+                    throw 'Invalid listener ' + listener;
+                }
+            }
+            var parsedEvent;
             if (typeof nativeEvents === 'string') {
-                group._addEvent(nativeEvents, groupEvent[1]);
+                parsedEvent = this._parseNativeEvent(nativeEvents);
+                group._addEvent(parsedEvent, eventName);
             } else {
                 for (var i = 0; i < nativeEvents.length; i++) {
                     var nativeEvent = nativeEvents[i];
-                    group._addEvent(nativeEvent, groupEvent[1]);
+                    parsedEvent = this._parseNativeEvent(nativeEvent);
+                    group._addEvent(parsedEvent, eventName);
+                }
+            }
+
+            // registering the callback for the new event
+            this._callbacks[group._name + ':' + eventName] = callback;
+        }
+    },
+
+    _parseNativeEvent: function(event){
+        var tokens = event.split(' ');
+        var parsedEvent = {};
+        parsedEvent.name = tokens[0];
+        var i;
+        for (i = 1; i < tokens.length; i++) {
+            var token = tokens[i]
+            if(MODIFIERS.indexOf(token) >= 0){
+                parsedEvent[token] = true;
+            } else {
+                parsedEvent.action = token.toLowerCase();
+            }
+        }
+
+        if(parsedEvent.action){
+            // user may have used ShiftRight or ShiftLeft to specify which shift key he wants to trigger the event.
+            // in that case adding the shift modifier as the browser will report it like that.
+            for (i = 0; i < MODIFIERS.length; i++) {
+                var mod = MODIFIERS[i]
+                if(parsedEvent.action.indexOf(mod) === 0){
+                    parsedEvent[mod] = true;
                 }
             }
         }
+
+        if(!parsedEvent.action && tokens.length > 1){
+            // user wants one of the modifier keys to be the action
+            // we take the lase one
+            parsedEvent.action = tokens[tokens.length -1];
+        }
+
+        return parsedEvent;
     },
 
     _getOrCreateGroup: function(name) {
@@ -166,14 +258,22 @@ InputManager.prototype = {
         if (priority < 0) {
             throw 'priority must be a positive number';
         }
-        var event;
+        var event, eventList, i;
         if (groupEvent[1]) {
-            event = group._events[groupEvent[1]];
-            event._priority = priority;
-        } else {
-            for (var key in group._events) {
-                event = group._events[key];
+            // setPriority on a specific event
+            eventList = group._events[groupEvent[1]];
+            for (i = 0; i < eventList.length; i++) {
+                event = eventList[i]
                 event._priority = priority;
+            }
+        } else {
+            // set Priority on a group, setting priority on all group's events.
+            for (var key in group._events) {
+                eventList = group._events[key];
+                for (i = 0; i < eventList.length; i++) {
+                    event = eventList[i]
+                    event._priority = priority;
+                }
             }
         }
     },
@@ -193,7 +293,8 @@ InputManager.prototype = {
             }
             for (var j = 0; j < queue.length; j++) {
                 var event = queue[j];
-                window.dispatchEvent(event);
+                this._callbacks[event.type](event);
+                //window.dispatchEvent(event);
                 event._nativeEvents = undefined;
             }
             //flush the queue
@@ -202,22 +303,12 @@ InputManager.prototype = {
     },
 
     _getSource: function(triggerName) {
-
         for (var sourceName in this._sources) {
             var source = this._sources[sourceName];
             if (source.supportsEvent(triggerName)) {
                 return source;
             }
         }
-
-        // for (var i = 1; i < this._sources.length; i++) {
-        //     var source = this._sources[i];
-        //     if (source.supportsEvent(triggerName)) {
-        //         return source;
-        //     }
-        // }
-        // //no target was found return the default one.
-        // return this._sources[0];
     },
 
     dumpGroups: function() {
@@ -229,8 +320,8 @@ InputManager.prototype = {
         for (var groupKey in this._groups) {
             var group = this._groups[groupKey];
             for (var eventKey in group._events) {
-                var event = group._events[eventKey];
-                var list = eventList[event._priority];
+                var events = group._events[eventKey];
+                var list = eventList[events[0]._priority];
                 if (!list) {
                     list = [];
                     eventList[event._priority] = list;

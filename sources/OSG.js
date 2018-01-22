@@ -27,6 +27,8 @@ OSG.osgStats = osgStats;
 OSG.osgText = osgText;
 OSG.osgWrappers = osgWrappers;
 OSG.osgPlugins = osgPlugins;
+OSG.inputManager = osgViewer.inputManager;
+var inputManager = osgViewer.inputManager;
 
 // for backward compatibility
 OSG.globalify = function() {
@@ -42,6 +44,7 @@ OSG.globalify = function() {
     window.osgText = OSG.osgText;
     window.osgWrappers = OSG.osgWrappers;
     window.osgPlugins = OSG.osgPlugins;
+    window.inputManager = OSG.inputManager;
 };
 
 export {
@@ -56,7 +59,8 @@ export {
     osgStats,
     osgText,
     osgWrappers,
-    osgPlugins
+    osgPlugins,
+    inputManager
 };
 
 export default OSG;

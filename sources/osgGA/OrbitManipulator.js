@@ -13,8 +13,8 @@ import DelayInterpolator from 'osgUtil/DelayInterpolator';
  *  OrbitManipulator
  *  @class
  */
-var OrbitManipulator = function(boundStrategy) {
-    Manipulator.call(this, boundStrategy);
+var OrbitManipulator = function(options) {
+    Manipulator.call(this, options);
     this._homePosition = vec3.create();
     this._frustum = {};
     this.init();

@@ -22,7 +22,12 @@ import Stats from 'osgStats/Stats';
 import defaultStats from 'osgStats/defaultStats';
 import glStats from 'osgStats/glStats';
 import browserStats from 'osgStats/browserStats';
-
+import InputManager from 'osgViewer/input/InputManager';
+import InputSourceMouse from 'osgViewer/input/source/InputSourceMouse';
+import InputSourceKeyboard from 'osgViewer/input/source/InputSourceKeyboard';
+import InputSourceWebVR from 'osgViewer/input/source/InputSourceWebVR';
+import InputSourceGamePad from 'osgViewer/input/source/InputSourceGamePad';
+import InputSourceDeviceOrientation from 'osgViewer/input/source/InputSourceDeviceOrientation';
 
 var Viewer = function(canvas, userOptions, error) {
     View.call(this);
@@ -40,7 +45,8 @@ var Viewer = function(canvas, userOptions, error) {
 
     if (!gl) throw 'No WebGL implementation found';
 
-    this.initDeviceEvents(options, canvas);
+    //this.initDeviceEvents(options, canvas);
+    this.initInputManager(options, canvas);
     this._updateVisitor = new UpdateVisitor();
 
     this.setUpView(gl.canvas, options);
@@ -81,6 +87,44 @@ utils.createPrototypeObject(
             eventsBackend.GamePad = eventsBackend.GamePad || {};
 
             this._eventProxy = this.initEventProxy(options);
+        },
+
+        initInputManager: function(options, canvas) {
+            //Maybe offer a better way to tweak this...
+            if (options.inputManager) {
+                this._inputManager = options.inputManager;
+                return;
+            }
+
+            var inputManager = new InputManager();
+
+            //Default mouse and keyboard
+            inputManager.registerInputSource(new InputSourceMouse(canvas));
+            inputManager.registerInputSource(new InputSourceKeyboard(document));
+
+            // touch inputs, Only activate them if we have a touch device in order to fix problems with IE11
+            if ('ontouchstart' in window) {
+                inputManager.registerInputSource(new InputSourceKeyboard(canvas));
+            }
+
+            inputManager.registerInputSource(new InputSourceWebVR());
+            inputManager.registerInputSource(new InputSourceGamePad());
+            inputManager.registerInputSource(new InputSourceDeviceOrientation());
+
+            this._inputManager = inputManager;
+
+            inputManager.addMappings(
+                { 'viewer.internals:hmdConnect': 'vrdisplayconnected' },
+                function(ev) {
+                    this.setVRDisplay(ev.vrDisplay);
+                }.bind(this)
+            );
+
+            inputManager.setEnable('viewer.internals', true);
+        },
+
+        getInputManager: function() {
+            return this._inputManager;
         },
 
         initOptions: function(userOptions) {
@@ -398,7 +442,8 @@ utils.createPrototypeObject(
             var canvasSizeChanged = this.updateViewport();
 
             // update inputs devices
-            this.updateEventProxy(this._eventProxy, this.getFrameStamp());
+            //this.updateEventProxy(this._eventProxy, this.getFrameStamp());
+            this._inputManager.update();
 
             // setup framestamp
             this._updateVisitor.setFrameStamp(this.getFrameStamp());
@@ -480,7 +525,7 @@ utils.createPrototypeObject(
 
         setupManipulator: function(manipulator /*, dontBindDefaultEvent */) {
             if (manipulator === undefined) {
-                manipulator = new OrbitManipulator();
+                manipulator = new OrbitManipulator({ inputManager: this._inputManager });
             }
 
             if (manipulator.setNode !== undefined) {
@@ -527,10 +572,6 @@ utils.createPrototypeObject(
             }
 
             return true;
-        },
-
-        initInputManager: function () {
-            //this.setVrDisplay(InputManager.getInputSource('WebVR').getHmd())
         },
 
         // intialize all input devices

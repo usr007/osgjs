@@ -20,8 +20,8 @@ import DelayInterpolator from 'osgUtil/DelayInterpolator';
  *  FirstPersonManipulator
  *  @class
  */
-var FirstPersonManipulator = function(boundStrategy) {
-    Manipulator.call(this, boundStrategy);
+var FirstPersonManipulator = function(options) {
+    Manipulator.call(this, options);
     this.init();
 };
 

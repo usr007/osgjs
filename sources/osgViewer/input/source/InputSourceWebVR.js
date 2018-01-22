@@ -2,6 +2,8 @@ import utils from 'osg/utils';
 import InputSource from 'osgViewer/input/source/InputSource';
 import notify from 'osg/notify';
 
+var POLL_INTERVAL = 3000;
+
 /**
  * WebVR Hmd device input handling.
  * @param canvas
@@ -11,7 +13,6 @@ var InputSourceWebVR = function() {
     InputSource.call(this);
     this._supportedEvents = ['vrdisplayposechanged', 'vrdisplayconnected', 'vrdisplaydisconnected'];
 
-    this._event = new Event('vrdisplayposechanged');
     this._callbacks = {};
     this._events = {};
     for (var i = 0; i < this._supportedEvents.length; i++) {
@@ -19,6 +20,7 @@ var InputSourceWebVR = function() {
         var event = new Event(eventName);
         this._events[eventName] = event;
     }
+    this._nbCallbacks = 0;
 
     this._pollHeadset();
 };
@@ -37,8 +39,10 @@ utils.createPrototypeObject(
             }
             if (enable) {
                 callbacks.push(callback);
+                this._nbCallbacks ++;
             } else {
-                callbacks.splice(callbacks.indexof(callback), 1);
+                var removed = callbacks.splice(callbacks.indexof(callback), 1);
+                if(removed) this._nbCallbacks --;
             }
         },
 
@@ -54,34 +58,37 @@ utils.createPrototypeObject(
                 return;
             }
 
-            var self = this;
-            navigator.getVRDisplays().then(function(displays) {
-                if (displays.length > 0) {
-                    notify.log('Found a VR display');
-                    if (self._hmd !== displays[0]) {
-                        //fire the disconnect event
-                        var event = this._events['vrdisplaydisconnected'];
-                        event.vrDisplay = this._hmd;
-                        this._callbacks['vrdisplaydisconnected'](event);
-
-                        //fire the connect event
-                        event = this._events['vrdisplayconnected'];
-                        event.vrDisplay = displays[0];
-                        this._callbacks['vrdisplayconnected'](event);
-                    }
-                    self._hmd = displays[0];
-                    self._frameData = new window.VRFrameData();
-                    // the viewer will now listen for vrdisplayconnected
-                    // self._viewer.setVRDisplay(self._hmd);
+            setInterval(function () {
+                if(!this._nbCallbacks){
+                    //don't poll if there is no callback registered.
+                    return;
                 }
-            });
+                var self = this;
+                navigator.getVRDisplays().then(function(displays) {
+                    if (displays.length > 0) {
+                        notify.log('Found a VR display');
+                        if (self._hmd !== displays[0]) {
+                            //fire the disconnect event
+                            var event = this._events['vrdisplaydisconnected'];
+                            event.vrDisplay = this._hmd;
+                            this._callbacks['vrdisplaydisconnected'](event);
+
+                            //fire the connect event
+                            event = this._events['vrdisplayconnected'];
+                            event.vrDisplay = displays[0];
+                            this._callbacks['vrdisplayconnected'](event);
+                        }
+                        self._hmd = displays[0];
+                        self._frameData = new window.VRFrameData();
+
+                    }
+                });
+            }.bind(this), POLL_INTERVAL);
+
+
         },
 
         poll: function() {
-            // this is asynchronous so it might not get an answer for this frame.
-            // maybe schedule this every second or 2... or keep it only at load time.
-            this._pollHeadset();
-
             if (!self._hmd) {
                 return;
             }
