@@ -120,6 +120,14 @@ utils.createPrototypeObject(
             return pos;
         },
 
+        setEnable: function(enabled){
+            this.getInputManager().setEnable(this.getInputGroupName(), enabled);
+        },
+
+        getInputGroupName: function(){
+            return 'scene.manipulators.fps';
+        },
+
         setTarget: function(pos) {
             var dir = this._tmpGetTargetDir;
             vec3.sub(dir, pos, this._eye);

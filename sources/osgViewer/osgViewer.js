@@ -3,7 +3,8 @@ import View from 'osgViewer/View';
 import Viewer from 'osgViewer/Viewer';
 import EventProxy from 'osgViewer/eventProxy/eventProxy';
 import Scene from 'osgViewer/Scene';
-import inputManager from 'osgViewer/input/InputManager'
+import Groups from 'osgViewer/input/InputConstants'
+
 
 var osgViewer = {};
 
@@ -12,6 +13,6 @@ osgViewer.View = View;
 osgViewer.Viewer = Viewer;
 osgViewer.EventProxy = EventProxy;
 osgViewer.Scene = Scene;
-osgViewer.inputManager = inputManager;
+osgViewer.InputGroups = Groups;
 
 export default osgViewer;

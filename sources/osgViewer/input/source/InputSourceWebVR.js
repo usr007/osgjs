@@ -33,20 +33,29 @@ utils.createPrototypeObject(
 
         setEnable: function(name, callback, enable) {
             var callbacks = this._callbacks[name];
-            if (!callbacks){
+            if (!callbacks) {
                 callbacks = [];
                 this._callbacks[name] = callbacks;
             }
+            var index = callbacks.indexOf(callback);
             if (enable) {
-                callbacks.push(callback);
-                this._nbCallbacks ++;
+                if (index < 0) {
+                    callbacks.push(callback);
+                    this._nbCallbacks++;
+                }
             } else {
-                var removed = callbacks.splice(callbacks.indexof(callback), 1);
-                if(removed) this._nbCallbacks --;
+                if (index >= 0) {
+                    callbacks.splice(index, 1);
+                    this._nbCallbacks--;
+                }
             }
         },
 
         populateEvent(ev, customEvent) {
+            if (ev.vrDisplay) {
+                customEvent.vrDisplay = ev.vrDisplay;
+                return;
+            }
             customEvent.pose = ev.pose;
             customEvent.sitToStandMatrix = ev.sitToStandMatrix;
         },
@@ -58,43 +67,56 @@ utils.createPrototypeObject(
                 return;
             }
 
-            setInterval(function () {
-                if(!this._nbCallbacks){
-                    //don't poll if there is no callback registered.
-                    return;
-                }
-                var self = this;
-                navigator.getVRDisplays().then(function(displays) {
-                    if (displays.length > 0) {
-                        notify.log('Found a VR display');
-                        if (self._hmd !== displays[0]) {
-                            //fire the disconnect event
-                            var event = this._events['vrdisplaydisconnected'];
-                            event.vrDisplay = this._hmd;
-                            this._callbacks['vrdisplaydisconnected'](event);
-
-                            //fire the connect event
-                            event = this._events['vrdisplayconnected'];
-                            event.vrDisplay = displays[0];
-                            this._callbacks['vrdisplayconnected'](event);
-                        }
-                        self._hmd = displays[0];
-                        self._frameData = new window.VRFrameData();
-
+            setInterval(
+                function() {
+                    if (!this._nbCallbacks) {
+                        //don't poll if there is no callback registered.
+                        return;
                     }
-                });
-            }.bind(this), POLL_INTERVAL);
+                    var self = this;
+                    navigator.getVRDisplays().then(function(displays) {
+                        if (displays.length > 0) {
+                            if (self._hmd !== displays[0]) {
+                                notify.log('Found a VR display');
+                                //fire the disconnect event
+                                var event = self._events['vrdisplaydisconnected'];
+                                event.vrDisplay = self._hmd;
+                                var i, callback;
+                                var callbacks = self._callbacks['vrdisplaydisconnected'];
+                                if (callbacks) {
+                                    for (i = 0; i < callbacks.length; i++) {
+                                        callback = callbacks[i];
+                                        callback(event);
+                                    }
+                                }
 
-
+                                //fire the connect event
+                                event = self._events['vrdisplayconnected'];
+                                event.vrDisplay = displays[0];
+                                callbacks = self._callbacks['vrdisplayconnected'];
+                                if (callbacks) {
+                                    for (i = 0; i < callbacks.length; i++) {
+                                        callback = callbacks[i];
+                                        callback(event);
+                                    }
+                                }
+                                self._hmd = displays[0];
+                                self._frameData = new window.VRFrameData();
+                            }
+                        }
+                    });
+                }.bind(this),
+                POLL_INTERVAL
+            );
         },
 
         poll: function() {
-            if (!self._hmd) {
+            if (!this._hmd) {
                 return;
             }
 
             var callbacks = this._callbacks['vrdisplayposechanged'];
-            if (!callbacks) {
+            if (!callbacks || !callbacks.length) {
                 return;
             }
 
@@ -116,38 +138,9 @@ utils.createPrototypeObject(
             event.sitToStandMatrix = sitToStand;
 
             for (var i = 0; i < callbacks.length; i++) {
-                var callback = callbacks[i]
+                var callback = callbacks[i];
                 callback(event);
             }
-
-
-            //This should be done in the adapter
-            // var q = pose.orientation;
-            //
-            //
-            // if (q) {
-            //     if (sitToStand) {
-            //         q = mat4.getRotation(tempQuat, sitToStand);
-            //         quat.mul(q, q, pose.orientation);
-            //     }
-            //
-            //     this._quat[0] = q[0];
-            //     this._quat[1] = -q[2];
-            //     this._quat[2] = q[1];
-            //     this._quat[3] = q[3];
-            // }
-            //
-            // var pos = pose.position;
-            // if (pos) {
-            //     if (sitToStand) {
-            //         pos = vec3.transformMat4(tempPos, pos, sitToStand);
-            //     }
-            //     this._pos[0] = pos[0] * this._worldScale;
-            //     this._pos[1] = -pos[2] * this._worldScale;
-            //     this._pos[2] = pos[1] * this._worldScale;
-            // }
-            //
-            // manipulatorAdapter.update(this._quat, this._pos);
         }
     }),
     'osgViewer',

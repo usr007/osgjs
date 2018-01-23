@@ -24,16 +24,27 @@ var InputSourceTouchScreen = function(canvas) {
     ];
     this._supportedEvents = ['touchstart', 'touchend', 'touchcancel'];
 
-    this._hammer = new Hammer.Manager(this._eventNode);
+    this._hammer = new Hammer.Manager(canvas);
 
     // defaults: { event: 'pan', pointers: 1, direction: Hammer.DIRECTION_HORIZONTAL, threshold: 10 }
     this._hammer.add(new Hammer.Pan());
+    this._hammer.add(new Hammer.Pinch());
 
-    //This should be handled in the manipulator...
-    //if (options.getBoolean('scrollwheel')) {
-        //defaults: { event: 'pinch', pointers: 2, threshold: 0 }
-        this._hammer.add(new Hammer.Pinch());
-    //}
+    // Let the pan be detected with two fingers.
+    // 2 => pan, 1 -> rotate
+    this._hammer.get('pan').set({
+        threshold: 0,
+        pointers: 0
+    });
+
+    var pinch = this._hammer.get('pinch');
+    // Set a minimal threshold on pinch event, to be detected after pan
+    // pinch disable as default
+    pinch.set({
+        threshold: 0.1,
+        enable: false
+    });
+    pinch.recognizeWith(this._hammer.get('pan'));
 
     this._hammer.add(
         new Hammer.Tap({
@@ -75,21 +86,31 @@ var InputSourceTouchScreen = function(canvas) {
 utils.createPrototypeObject(
     InputSourceTouchScreen,
     utils.objectInherit(InputSource.prototype, {
-
-        getName: function () {
+        getName: function() {
             return 'TouchScreen';
         },
 
         setEnable: function(name, callback, enable) {
-            if (enable) {
-                this._target.addEventListener(name, callback);
+            if (this._isNativeEvent(name)) {
+                if (enable) {
+                    this._target.addEventListener(name, callback);
+                } else {
+                    this._target.removeEventListener(name, callback);
+                }
             } else {
-                this._target.removeEventListener(name, callback);
+                if (name.indexOf('pinch') >= 0 && enable) {
+                    this._hammer.get('pinch').set({ enable: true });
+                }
+                if (enable) {
+                    this._hammer.on(name, callback);
+                } else {
+                    this._hammer.off(name, callback);
+                }
             }
         },
 
         populateEvent(ev, customEvent) {
-            if (this._isNativeEvent(ev)) {
+            if (this._isNativeEvent(ev.type)) {
                 //native event
                 customEvent.canvasX = customEvent.canvasY = 0;
                 var nbTouches = ev.touches.length;
@@ -102,13 +123,20 @@ utils.createPrototypeObject(
                 customEvent.shiftKey = ev.shiftKey;
                 customEvent.altKey = ev.altKey;
                 customEvent.metaKey = ev.metaKey;
+                customEvent.pointers = ev.touches;
             } else {
                 //hammer event
                 customEvent.canvasX = ev.center.x;
                 customEvent.canvasY = ev.center.y;
                 customEvent.scale = ev.scale;
+                customEvent.rotation = ev.rotation;
                 customEvent.deltaX = ev.deltaX;
                 customEvent.deltaY = ev.deltaY;
+                customEvent.deltaTime = ev.deltaTime;
+                customEvent.direction = ev.direction;
+                customEvent.offsetDirection = ev.offsetDirection;
+                customEvent.pointers = ev.pointers;
+                customEvent.velocity = ev.velocity;
             }
 
             var offset = this._target.getBoundingClientRect();
@@ -116,8 +144,43 @@ utils.createPrototypeObject(
             customEvent.canvasX += -offset.top;
         },
 
-        _isNativeEvent: function(ev) {
-            return ev.type === 'touchstart' || ev.type === 'touchend' || ev.type === 'touchcancel';
+        _isNativeEvent: function(evt) {
+            return evt === 'touchstart' || evt === 'touchend' || evt === 'touchcancel';
+        },
+
+        matches: function(nativeEvent, parsedEvent) {
+            if(nativeEvent.pointerType && nativeEvent.pointerType !== 'touch'){
+                return false;
+            }
+
+            if (!parsedEvent.action) {
+                return true;
+            }
+
+            if (isNaN(parsedEvent.action)) {
+                throw 'touch action should be a number representing the number of touches';
+            }
+
+            var touches = nativeEvent.pointers;
+            if (!touches) {
+                touches = nativeEvent.touches;
+            }
+
+            var nbTouches = parseInt(parsedEvent.action);
+
+            if (nativeEvent.type === 'touchend' || nativeEvent.type === 'touchcancel'){
+                //on touch end the number of touches will always be below the requested number of touches
+                if (touches.length >= nbTouches) {
+                    return false;
+                }
+            } else {
+                if (touches.length !== nbTouches) {
+                    return false;
+                }
+            }
+
+
+            return true;
         },
 
         supportsEvent: function(eventName) {

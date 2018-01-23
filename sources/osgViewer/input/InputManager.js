@@ -6,15 +6,14 @@ var MODIFIERS = ['shift', 'alt', 'ctrl', 'meta'];
  * @constructor
  */
 var InputGroup = function(inputManager, name) {
+    // true when this group is enabled
+    this._enabled = true;
 
     // the name of the group
     this._name = name;
 
-    // true when this group is enabled
-    this._isEnabled = true;
-
-    // reference to the inputManager
-    this._inputManager = inputManager;
+    //mask attribute when a "parent" group is disabled.
+    this._mask = [];
 
     // Map of for custom event names to events instances
     // { 'customEventName' : [event1, event2 ...]}
@@ -24,13 +23,16 @@ var InputGroup = function(inputManager, name) {
     // Map for native event names to events instances.
     this._mappings = {};
 
-    // input sources that have to be polled on each frame. (not event based)
-    this._pollableSources = [];
+    // reference to the inputManager
+    this._inputManager = inputManager;
+
+    // the callback to collect native events bound to this instance
+    this._boundCallback = this._collectNativeEvents.bind(this);
 };
 
 InputGroup.prototype = {
     _collectNativeEvents: function(nativeEvent) {
-        if (!this._isEnabled) {
+        if (!this._enabled || this._mask.length) {
             return;
         }
         nativeEvent.preventDefault();
@@ -40,7 +42,7 @@ InputGroup.prototype = {
         }
         for (var i = 0; i < events.length; i++) {
             var event = events[i];
-            if(event._source.matches && !event._source.matches(nativeEvent, event._parsedEvent)){
+            if (event._source.matches && !event._source.matches(nativeEvent, event._parsedEvent)) {
                 continue;
             }
             event._source.populateEvent(nativeEvent, event);
@@ -59,7 +61,6 @@ InputGroup.prototype = {
     },
 
     _addEvent: function(nativeEvent, eventName) {
-
         // creating an event instance for each eventName / nativeEvent combination.
         var event = new Event(this._name + ':' + eventName);
         event._parsedEvent = nativeEvent;
@@ -67,7 +68,7 @@ InputGroup.prototype = {
 
         // adding the new event to the events map
         var eventList = this._events[eventName];
-        if(!eventList){
+        if (!eventList) {
             eventList = [];
         }
         eventList.push(event);
@@ -84,25 +85,31 @@ InputGroup.prototype = {
         // finding the source of the native event and enable the dispatch
         var source = this._inputManager._getSource(nativeEvent.name);
         if (source) {
-            this._enableEventOnSource(nativeEvent.name, source);
+            if (this._enabled) {
+                source.setEnable(nativeEvent.name, this._boundCallback, true);
+            }
             event._source = source;
         }
-
     },
 
-    _enableEventOnSource: function(nativeEvent, source) {
-        if (source.poll) {
-            //pollable source
-            this._pollableSources.push(source);
+    addMappings: function(mappings, listener) {
+        for (var key in mappings) {
+            mappings[this._name + ':' + key] = mappings[key];
+            delete mappings[key];
         }
-        source.setEnable(nativeEvent, this._collectNativeEvents.bind(this), true);
+
+        this._inputManager.addMappings(mappings, listener);
     },
 
-    _poll: function() {
-        for (var i = 0; i < this._pollableSources.length; i++) {
-            var source = this._pollableSources[i];
-            //poll will generate appropriate events.
-            source.poll();
+    _setEnable: function(enable) {
+        this._enabled = enable;
+        // adding / removing native events
+        for (var nativeEvent in this._mappings) {
+            var events = this._mappings[nativeEvent];
+            for (var i = 0; i < events.length; i++) {
+                var evt = events[i];
+                evt._source.setEnable(nativeEvent, this._boundCallback, enable);
+            }
         }
     }
 };
@@ -111,11 +118,11 @@ InputGroup.prototype = {
  * InputManager
  */
 var InputManager = function() {
-    // Contains all registered input sources.
-    this._sources = {};
-
     // Contains all created input groups
     this._groups = {};
+
+    // Contains all registered input sources.
+    this._sources = [];
 
     // Event queues filled each frame with all the events to dispatch
     // queues[0] = [event1, event2]
@@ -129,6 +136,9 @@ var InputManager = function() {
 
     // the map af callbacks
     this._callbacks = {};
+
+    // Custom parameters
+    this._params = {};
 };
 
 InputManager.prototype = {
@@ -140,7 +150,7 @@ InputManager.prototype = {
         if (!source.setEnable || !source.supportsEvent || !source.getName) {
             throw 'Invalid input target ' + JSON.stringify(source);
         }
-        this._sources[source.getName()] = source;
+        this._sources.push(source);
     },
 
     addMappings: function(mappings, listener) {
@@ -184,38 +194,42 @@ InputManager.prototype = {
         }
     },
 
-    _parseNativeEvent: function(event){
+    _parseNativeEvent: function(event) {
         var tokens = event.split(' ');
         var parsedEvent = {};
         parsedEvent.name = tokens[0];
         var i;
         for (i = 1; i < tokens.length; i++) {
-            var token = tokens[i]
-            if(MODIFIERS.indexOf(token) >= 0){
+            var token = tokens[i];
+            if (MODIFIERS.indexOf(token) >= 0) {
                 parsedEvent[token] = true;
             } else {
                 parsedEvent.action = token.toLowerCase();
             }
         }
 
-        if(parsedEvent.action){
+        if (parsedEvent.action) {
             // user may have used ShiftRight or ShiftLeft to specify which shift key he wants to trigger the event.
             // in that case adding the shift modifier as the browser will report it like that.
             for (i = 0; i < MODIFIERS.length; i++) {
-                var mod = MODIFIERS[i]
-                if(parsedEvent.action.indexOf(mod) === 0){
+                var mod = MODIFIERS[i];
+                if (parsedEvent.action.indexOf(mod) === 0) {
                     parsedEvent[mod] = true;
                 }
             }
         }
 
-        if(!parsedEvent.action && tokens.length > 1){
+        if (!parsedEvent.action && tokens.length > 1) {
             // user wants one of the modifier keys to be the action
             // we take the lase one
-            parsedEvent.action = tokens[tokens.length -1];
+            parsedEvent.action = tokens[tokens.length - 1];
         }
 
         return parsedEvent;
+    },
+
+    group: function(name) {
+        return this._getOrCreateGroup(name);
     },
 
     _getOrCreateGroup: function(name) {
@@ -227,19 +241,32 @@ InputManager.prototype = {
         return group;
     },
 
-    _getGroup: function(groupName) {
-        var group = this._groups[groupName];
-        if (!group) {
-            console.warn("Couldn't find input group named " + groupName);
-            return undefined;
-        }
-        return group;
-    },
-
     setEnable: function(groupName, enable) {
-        var group = this._getGroup(groupName);
-        if (!group) return;
-        group._isEnabled = enable;
+        var group = this._groups[groupName];
+        if (group) {
+            group._setEnable(enable);
+            return;
+        }
+
+        var index;
+        //check for partial groups.
+        for (var key in this._groups) {
+            group = this._groups[key];
+
+            if (enable) {
+                // remove the group name from the mask
+                index = group._mask.indexOf(groupName);
+                if (index >= 0) {
+                    group._mask.splice(index, 1);
+                }
+            } else {
+                // add the group to the mask
+                index = group._name.indexOf(groupName);
+                if (index === 0 && group._name[index + groupName.length] === '.') {
+                    group._mask.push(groupName);
+                }
+            }
+        }
     },
 
     /**
@@ -253,8 +280,11 @@ InputManager.prototype = {
     setPriority: function(eventName, priority) {
         var groupEvent = eventName.split(':');
 
-        var group = this._getGroup(groupEvent[0]);
-        if (!group) return;
+        var group = this._groups[groupEvent[0]];
+        if (!group) {
+            console.warn("Couldn't find input group named " + groupEvent[0]);
+            return;
+        }
         if (priority < 0) {
             throw 'priority must be a positive number';
         }
@@ -263,7 +293,7 @@ InputManager.prototype = {
             // setPriority on a specific event
             eventList = group._events[groupEvent[1]];
             for (i = 0; i < eventList.length; i++) {
-                event = eventList[i]
+                event = eventList[i];
                 event._priority = priority;
             }
         } else {
@@ -271,7 +301,7 @@ InputManager.prototype = {
             for (var key in group._events) {
                 eventList = group._events[key];
                 for (i = 0; i < eventList.length; i++) {
-                    event = eventList[i]
+                    event = eventList[i];
                     event._priority = priority;
                 }
             }
@@ -279,14 +309,17 @@ InputManager.prototype = {
     },
 
     update: function() {
-        //Groups poll (in case of non event based input sources, they have to be polled to get information)
-        for (var k = 0; k < this._groups.length; k++) {
-            var group = this._groups[k];
-            group._poll();
+        var i;
+        //polling sources if relevant
+        for (i = 0; i < this._sources.length; i++) {
+            var source = this._sources[i];
+            if (source.poll) {
+                source.poll();
+            }
         }
 
         //dispatch all queued events by priority order
-        for (var i = 0; i < this._queues.length; i++) {
+        for (i = 0; i < this._queues.length; i++) {
             var queue = this._queues[i];
             if (!queue) {
                 continue;
@@ -303,12 +336,20 @@ InputManager.prototype = {
     },
 
     _getSource: function(triggerName) {
-        for (var sourceName in this._sources) {
-            var source = this._sources[sourceName];
+        for (var i = 0; i < this._sources.length; i++) {
+            var source = this._sources[i];
             if (source.supportsEvent(triggerName)) {
                 return source;
             }
         }
+    },
+
+    getParam: function(name){
+        return this._params[name];
+    },
+
+    setParam: function(name, value){
+        this._params[name] = value;
     },
 
     dumpGroups: function() {

@@ -28,6 +28,7 @@ import InputSourceKeyboard from 'osgViewer/input/source/InputSourceKeyboard';
 import InputSourceWebVR from 'osgViewer/input/source/InputSourceWebVR';
 import InputSourceGamePad from 'osgViewer/input/source/InputSourceGamePad';
 import InputSourceDeviceOrientation from 'osgViewer/input/source/InputSourceDeviceOrientation';
+import InputSourceTouchScreen from 'osgViewer/input/source/InputSourceTouchScreen'
 
 var Viewer = function(canvas, userOptions, error) {
     View.call(this);
@@ -104,7 +105,7 @@ utils.createPrototypeObject(
 
             // touch inputs, Only activate them if we have a touch device in order to fix problems with IE11
             if ('ontouchstart' in window) {
-                inputManager.registerInputSource(new InputSourceKeyboard(canvas));
+                inputManager.registerInputSource(new InputSourceTouchScreen(canvas));
             }
 
             inputManager.registerInputSource(new InputSourceWebVR());
@@ -635,20 +636,17 @@ utils.createPrototypeObject(
         },
 
         setManipulator: function(manipulator) {
-            if (this._manipulator) this.removeEventProxy();
+            this.setEnableManipulator(false);
 
             if (!manipulator.getCamera()) manipulator.setCamera(this.getCamera());
 
+            manipulator.setEnable(true);
             View.prototype.setManipulator.call(this, manipulator);
         },
 
         setEnableManipulator: function(bool) {
             if (!this._manipulator) return;
-
-            var controllerMap = this._manipulator.getControllerList();
-            for (var name in controllerMap) {
-                controllerMap[name].setEnable(bool);
-            }
+            this._manipulator.setEnable(bool);
         },
 
         removeEventProxy: function() {

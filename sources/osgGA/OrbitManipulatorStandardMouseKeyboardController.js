@@ -2,6 +2,7 @@ import Controller from 'osgGA/Controller';
 import utils from 'osg/utils';
 import osgMath from 'osg/math';
 import OrbitManipulatorEnums from 'osgGA/orbitManipulatorEnums';
+import Groups from 'osgViewer/input/InputConstants';
 
 var OrbitManipulatorStandardMouseKeyboardController = function(manipulator) {
     Controller.call(this, manipulator);
@@ -15,10 +16,6 @@ utils.createPrototypeObject(
             this._delay = 0.15;
             this._mode = undefined;
             this._inMotion = false;
-
-            if (!this._manipulator.getInputManager()) {
-                return;
-            }
 
             var manager = this._manipulator.getInputManager();
             var setRotationMode = this.changeMode.bind(
@@ -37,38 +34,29 @@ utils.createPrototypeObject(
                 this._manipulator.getZoomInterpolator()
             );
 
-            manager.addMappings(
+
+            manager.group(Groups.ORBIT_MANIPULATOR_MOUSEKEYBARD).addMappings(
                 {
-                    'scene.manipulators.orbit:motion': 'mousemove',
-                    'scene.manipulators.orbit:startPan': [
-                        'mousedown shift 0',
-                        'mousedown 1',
-                        'mousedown 2'
-                    ],
-                    'scene.manipulators.orbit:startZoom': ['mousedown ctrl 0', 'mousedown ctrl 2'],
-                    'scene.manipulators.orbit:startRotate': 'mousedown 0',
-                    'scene.manipulators.orbit:stopMotion': [
-                        'mouseup',
-                        'mouseout',
-                        'keyup a',
-                        'keyup s',
-                        'keyup d'
-                    ],
-                    'scene.manipulators.orbit:zoom': 'wheel',
-                    'scene.manipulators.orbit:resetToHome': 'keydown space'
+                    motion: 'mousemove',
+                    startPan: ['mousedown shift 0', 'mousedown 1', 'mousedown 2'],
+                    startZoom: ['mousedown ctrl 0', 'mousedown ctrl 2'],
+                    startRotate: 'mousedown 0',
+                    stopMotion: ['mouseup', 'mouseout', 'keyup a', 'keyup s', 'keyup d'],
+                    zoom: 'wheel',
+                    resetToHome: 'keydown space'
                 },
                 this
             );
 
-            manager.addMappings(
-                { 'scene.manipulators.orbit:setRotationMode': 'keydown a' },
-                setRotationMode
-            );
-            manager.addMappings({ 'scene.manipulators.orbit:setPanMode': 'keydown d' }, setPanMode);
-            manager.addMappings(
-                { 'scene.manipulators.orbit:setZoomMode': 'keydown s' },
-                setZoomMode
-            );
+            manager
+                .group('scene.manipulators.orbit.mousekeyboard')
+                .addMappings({ setRotationMode: 'keydown a' }, setRotationMode);
+            manager
+                .group('scene.manipulators.orbit.mousekeyboard')
+                .addMappings({ setPanMode: 'keydown d' }, setPanMode);
+            manager
+                .group('scene.manipulators.orbit.mousekeyboard')
+                .addMappings({ setZoomMode: 'keydown s' }, setZoomMode);
         },
 
         // called to enable/disable controller

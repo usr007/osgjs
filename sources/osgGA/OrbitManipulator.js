@@ -174,6 +174,14 @@ utils.createPrototypeObject(
             };
         })(),
 
+        setEnable: function(enabled){
+            this.getInputManager().setEnable(this.getInputGroupName(), enabled);
+        },
+
+        getInputGroupName: function(){
+            return 'scene.manipulators.orbit';
+        },
+
         computeHomePosition: function(boundStrategy) {
             var bs = this.getHomeBoundingSphere(boundStrategy);
             if (!bs || !bs.valid()) return;

@@ -23,7 +23,7 @@ utils.createPrototypeObject(
 
             this._lastPos = undefined; // to set the pivot for rotation
             this._dragStarted = false;
-            this._transformStarted = false;
+            this._zooming = false;
             this._isValid = false;
         },
 
@@ -33,7 +33,7 @@ utils.createPrototypeObject(
                 // reset mode if we disable it
                 this._dragStarted = false;
                 this._lastPos = undefined;
-                this._transformStarted = false;
+                this._zooming = false;
                 this._nbPointerLast = 0;
             }
             Controller.prototype.setEnable.call(this, bool);
@@ -92,7 +92,7 @@ utils.createPrototypeObject(
             if (!this._isValid) return;
 
             var manipulator = this._manipulator;
-            if (!manipulator || this._transformStarted || event.pointerType === 'mouse') {
+            if (!manipulator || this._zooming || event.pointerType === 'mouse') {
                 return;
             }
 
@@ -173,7 +173,7 @@ utils.createPrototypeObject(
                 return;
             }
 
-            this._transformStarted = true;
+            this._zooming = true;
 
             this._lastScale = event.scale;
             manipulator.getZoomInterpolator().reset();
@@ -188,14 +188,14 @@ utils.createPrototypeObject(
                 return;
             }
 
-            this._transformStarted = false;
+            this._zooming = false;
         },
 
         pinchInOut: function(event) {
             if (!this._isValid) return;
 
             var manipulator = this._manipulator;
-            if (!manipulator || !this._transformStarted || event.pointerType === 'mouse') {
+            if (!manipulator || !this._zooming || event.pointerType === 'mouse') {
                 return;
             }
 
