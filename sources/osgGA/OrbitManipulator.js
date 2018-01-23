@@ -8,6 +8,7 @@ import OrbitManipulatorHammerController from 'osgGA/OrbitManipulatorHammerContro
 import OrbitManipulatorStandardMouseKeyboardController from 'osgGA/OrbitManipulatorStandardMouseKeyboardController';
 import OrbitManipulatorWebVRController from 'osgGA/OrbitManipulatorWebVRController';
 import DelayInterpolator from 'osgUtil/DelayInterpolator';
+import Groups from 'osgViewer/input/InputConstants';
 
 /**
  *  OrbitManipulator
@@ -174,12 +175,8 @@ utils.createPrototypeObject(
             };
         })(),
 
-        setEnable: function(enabled){
-            this.getInputManager().setEnable(this.getInputGroupName(), enabled);
-        },
-
-        getInputGroupName: function(){
-            return 'scene.manipulators.orbit';
+        setEnable: function(enabled) {
+            this.getInputManager().setEnable(Groups.ORBIT_MANIPULATOR, enabled);
         },
 
         computeHomePosition: function(boundStrategy) {

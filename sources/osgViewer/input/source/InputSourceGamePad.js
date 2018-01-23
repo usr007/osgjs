@@ -10,11 +10,16 @@ var POLL_INTERVAL = 3000;
 var InputSourceGamePad = function() {
     InputSource.call(this);
     this._target = window;
-    this._supportedEvents = ['buttonPressed', 'axischanged', 'gamepadconnected', 'gamepaddisconnected'];
+    this._supportedEvents = [
+        'buttonPressed',
+        'axischanged',
+        'gamepadconnected',
+        'gamepaddisconnected'
+    ];
     this._callbacks = {};
     this._events = {};
     for (var i = 0; i < this._supportedEvents.length; i++) {
-        var eventName = this._supportedEvents[i]
+        var eventName = this._supportedEvents[i];
         var event = new Event(eventName);
         this._events[eventName] = event;
     }
@@ -30,23 +35,23 @@ utils.createPrototypeObject(
 
         setEnable: function(name, callback, enable) {
             var callbacks = this._callbacks[name];
-            if (!callbacks){
+            if (!callbacks) {
                 callbacks = [];
                 this._callbacks[name] = callbacks;
             }
             if (enable) {
                 callbacks.push(callback);
-                this._nbCallbacks ++;
+                this._nbCallbacks++;
             } else {
                 var removed = callbacks.splice(callbacks.indexof(callback), 1);
-                if(removed) this._nbCallbacks --;
+                if (removed) this._nbCallbacks--;
             }
         },
 
         _gamepadPoll: function() {
             if (!navigator.getGamepads) return null;
 
-            setInterval(function () {
+            setInterval(function() {
                 var gamepads = navigator.getGamepads();
                 var gamepad = gamepads[this._gamepadIndex];
                 if (gamepad) {
@@ -71,12 +76,11 @@ utils.createPrototypeObject(
                 }
                 return null;
             }, POLL_INTERVAL);
-
         },
 
-        _onConnectionStateChange: function(gamepad, state){
+        _onConnectionStateChange: function(gamepad, state) {
             var callback = this._callbacks[state];
-            if(!callback){
+            if (!callback) {
                 return;
             }
             var event = this._events[state];
@@ -84,7 +88,7 @@ utils.createPrototypeObject(
             callback(gamepad);
         },
 
-        populateEvent(ev, customEvent) {
+        populateEvent: function(ev, customEvent) {
             if (ev.button) {
                 customEvent.button = ev.button;
                 customEvent.value = ev.value;
@@ -95,42 +99,42 @@ utils.createPrototypeObject(
                 customEvent.value = ev.value;
             }
         },
-        
-        poll: function () {
+
+        poll: function() {
             var gamepad = this._gamePad;
             if (!gamepad) return;
 
             var buttonPressedCallbacks = this._callbacks['buttonpressed'];
-            if(!buttonPressedCallbacks){
+            if (!buttonPressedCallbacks) {
                 return;
             }
             var event;
             for (var i = 0; i < gamepad.buttons.length; i++) {
-                var button = gamepad.buttons[i]
-                if(button.pressed || button.value >0){
+                var button = gamepad.buttons[i];
+                if (button.pressed || button.value > 0) {
                     event = this._events['buttonpressed'];
                     event.button = i;
                     event.value = button.value;
                     for (var j = 0; j < buttonPressedCallbacks.length; j++) {
-                        var cb = buttonPressedCallbacks[j]
+                        var cb = buttonPressedCallbacks[j];
                         cb(event);
                     }
                 }
             }
 
             var axisChangedCallback = this._callbacks['axischanged'];
-            if(!axisChangedCallback){
+            if (!axisChangedCallback) {
                 return;
             }
 
             for (i = 0; i < gamepad.axes.length; i++) {
-                var axis = gamepad.axes[i]
+                var axis = gamepad.axes[i];
                 //firing the event on each frame... maybe we could check for changes.
                 event = this._events['axischanged'];
                 event.axis = i;
                 event.value = axis;
                 for (j = 0; j < axisChangedCallback.length; j++) {
-                    cb = axisChangedCallback[j]
+                    cb = axisChangedCallback[j];
                     cb(event);
                 }
             }

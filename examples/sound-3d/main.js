@@ -135,7 +135,7 @@
             this._viewer.getManipulator().computeHomePosition();
 
             this._viewer.getInputManager().dumpGroups();
-            
+
             for (var i = 0, l = this._soundList.length; i < l; i++) {
                 var sound = this._soundList[i];
                 this.createSound(sound)

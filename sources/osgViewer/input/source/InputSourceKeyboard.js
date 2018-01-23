@@ -26,7 +26,7 @@ utils.createPrototypeObject(
             }
         },
 
-        populateEvent(ev, customEvent) {
+        populateEvent: function(ev, customEvent) {
             customEvent.key = ev.key;
             customEvent.keyCode = ev.keyCode;
             customEvent.code = ev.code;
@@ -41,28 +41,28 @@ utils.createPrototypeObject(
         },
 
         matches: function(nativeEvent, parsedEvent) {
-            if (!parsedEvent.action){
+            if (!parsedEvent.action) {
                 return true;
             }
-            if(nativeEvent.key.toLowerCase() !== parsedEvent.action) {
-                if(nativeEvent.code.toLowerCase() !== parsedEvent.action) {
-                 //   console.log('no match', nativeEvent.key, nativeEvent.code, parsedEvent.action);
+            if (nativeEvent.key.toLowerCase() !== parsedEvent.action) {
+                if (nativeEvent.code.toLowerCase() !== parsedEvent.action) {
+                    //   console.log('no match', nativeEvent.key, nativeEvent.code, parsedEvent.action);
                     return false;
                 }
             }
-            if(nativeEvent.ctrlKey !== !!parsedEvent.ctrl){
+            if (nativeEvent.ctrlKey !== !!parsedEvent.ctrl) {
                 //console.log('ctrl no match');
                 return false;
             }
-            if(nativeEvent.shiftKey !== !!parsedEvent.shift){
+            if (nativeEvent.shiftKey !== !!parsedEvent.shift) {
                 //console.log('shift no match');
                 return false;
             }
-            if(nativeEvent.altKey !== !!parsedEvent.alt){
+            if (nativeEvent.altKey !== !!parsedEvent.alt) {
                 //console.log('alt no match');
                 return false;
             }
-            if(nativeEvent.metaKey !== !!parsedEvent.meta){
+            if (nativeEvent.metaKey !== !!parsedEvent.meta) {
                 //console.log('meta no match');
                 return false;
             }

@@ -51,13 +51,15 @@ utils.createPrototypeObject(
             }
         },
 
-        populateEvent(ev, customEvent) {
+        populateEvent: function(ev, customEvent) {
             if (ev.vrDisplay) {
                 customEvent.vrDisplay = ev.vrDisplay;
                 return;
             }
             customEvent.pose = ev.pose;
             customEvent.sitToStandMatrix = ev.sitToStandMatrix;
+            customEvent.worldScale = this._inputManager.getParam('worldScale');
+            if (!customEvent.worldScale) customEvent.worldScale = 1.0;
         },
 
         _pollHeadset: function() {

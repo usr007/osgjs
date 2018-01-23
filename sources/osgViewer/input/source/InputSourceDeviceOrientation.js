@@ -25,7 +25,7 @@ utils.createPrototypeObject(
             }
         },
 
-        populateEvent(ev, customEvent) {
+        populateEvent: function(ev, customEvent) {
             if (ev.alpha !== null && ev.alpha !== undefined) {
                 customEvent.absolute = ev.absolute;
                 customEvent.alpha = ev.alpha;

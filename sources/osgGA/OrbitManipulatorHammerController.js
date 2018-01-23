@@ -113,8 +113,6 @@ utils.createPrototypeObject(
         },
 
         pinchStart: function(event) {
-            if (event.pointerType === 'mouse') return;
-
             this._zooming = true;
             this._lastScale = event.scale;
             var zoomInterpolator = this._manipulator.getZoomInterpolator();

@@ -1,4 +1,4 @@
-var DEFAULT_PRIORITY = 3;
+var DEFAULT_PRIORITY = 10;
 var MODIFIERS = ['shift', 'alt', 'ctrl', 'meta'];
 
 /**
@@ -48,6 +48,8 @@ InputGroup.prototype = {
             event._source.populateEvent(nativeEvent, event);
             if (!event._nativeEvents) {
                 event._nativeEvents = [];
+            }
+            if (!event._nativeEvents.length) {
                 //event must be queued
                 var queue = this._inputManager._queues[event._priority];
                 if (!queue) {
@@ -151,6 +153,7 @@ InputManager.prototype = {
             throw 'Invalid input target ' + JSON.stringify(source);
         }
         this._sources.push(source);
+        source.setInputManager(this);
     },
 
     addMappings: function(mappings, listener) {
@@ -267,6 +270,22 @@ InputManager.prototype = {
                 }
             }
         }
+        if (!enable) {
+            //discard all queued event emitted from this group
+            for (var i = 0; i < this._queues.length; i++) {
+                var queue = this._queues[i];
+                if (!queue) {
+                    continue;
+                }
+                for (var j = queue.length - 1; j >= 0; j--) {
+                    var evt = queue[j];
+                    if (evt.type.indexOf(groupName) >= 0) {
+                        queue.splice(j, 1);
+                        evt._nativeEvents.length = 0;
+                    }
+                }
+            }
+        }
     },
 
     /**
@@ -308,6 +327,19 @@ InputManager.prototype = {
         }
     },
 
+    getHigherPriority: function(groupName) {
+        var priority = DEFAULT_PRIORITY;
+        for (var key in this._groups) {
+            var group = this._groups[key];
+            if (group._name.indexOf(groupName) >= 0) {
+                if (group._priority < priority) {
+                    priority = group._priority;
+                }
+            }
+        }
+        return priority > 0 ? priority - 1 : 0;
+    },
+
     update: function() {
         var i;
         //polling sources if relevant
@@ -328,7 +360,7 @@ InputManager.prototype = {
                 var event = queue[j];
                 this._callbacks[event.type](event);
                 //window.dispatchEvent(event);
-                event._nativeEvents = undefined;
+                event._nativeEvents.length = 0;
             }
             //flush the queue
             queue.length = 0;
@@ -344,11 +376,11 @@ InputManager.prototype = {
         }
     },
 
-    getParam: function(name){
+    getParam: function(name) {
         return this._params[name];
     },
 
-    setParam: function(name, value){
+    setParam: function(name, value) {
         this._params[name] = value;
     },
 
@@ -365,9 +397,9 @@ InputManager.prototype = {
                 var list = eventList[events[0]._priority];
                 if (!list) {
                     list = [];
-                    eventList[event._priority] = list;
+                    eventList[events[0]._priority] = list;
                 }
-                list.push(event);
+                list.push(events[0]);
             }
         }
         console.log(eventList);

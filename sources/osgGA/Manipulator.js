@@ -4,8 +4,8 @@ import { mat4 } from 'osg/glMatrix';
 
 // Base class for Camera / User manipulator
 var Manipulator = function(options) {
-    if(options){
-        if(typeof options === 'object') {
+    if (options) {
+        if (typeof options === 'object') {
             this._boundStrategy = options.boundStrategy;
             this.setInputManager(options.inputManager);
         } else {
@@ -16,7 +16,6 @@ var Manipulator = function(options) {
     if (this._boundStrategy === undefined) {
         this._boundStrategy = Manipulator.COMPUTE_HOME_USING_SPHERE;
     }
-
 
     this._controllerList = {};
     this._inverseMatrix = mat4.create();
@@ -46,11 +45,11 @@ Manipulator.prototype = {
         return this._computeBoundNodeMaskOverride;
     },
 
-    setInputManager(inputManager){
+    setInputManager: function(inputManager) {
         this._inputManager = inputManager;
     },
 
-    getInputManager(){
+    getInputManager: function() {
         return this._inputManager;
     },
 

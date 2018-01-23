@@ -19,6 +19,10 @@ InputSource.prototype = {
         return false;
     },
 
+    setInputManager: function(inputManager){
+        this._inputManager = inputManager;
+    }
+
 };
 
 export default InputSource;

@@ -19,14 +19,13 @@ var InputSourceMouse = function(canvas) {
         'mouseover',
         'mouseout',
         'mouseup',
-        'wheel',
+        'wheel'
     ];
 };
 utils.createPrototypeObject(
     InputSourceMouse,
     utils.objectInherit(InputSource.prototype, {
-
-        getName: function () {
+        getName: function() {
             return 'Mouse';
         },
 
@@ -37,14 +36,14 @@ utils.createPrototypeObject(
 
             if (enable) {
                 this._target.addEventListener(name, callback);
-                if(name === 'wheel' ){
+                if (name === 'wheel') {
                     this._target.addEventListener('mousewheel', callback);
                     this._target.addEventListener('DOMMouseScroll', callback);
                     this._target.addEventListener('MozMousePixelScroll', callback);
                 }
             } else {
                 this._target.removeEventListener(name, callback);
-                if(name === 'wheel' ){
+                if (name === 'wheel') {
                     this._target.addEventListener('mousewheel', callback);
                     this._target.removeEventListener('DOMMouseScroll', callback);
                     this._target.removeEventListener('MozMousePixelScroll', callback);
@@ -52,15 +51,16 @@ utils.createPrototypeObject(
             }
         },
 
-        populateEvent(ev, customEvent) {
+        populateEvent: function(ev, customEvent) {
             // desktop - mouse
             customEvent.canvasX = ev.offsetX === undefined ? ev.layerX : ev.offsetX;
             customEvent.canvasY = ev.offsetY === undefined ? ev.layerY : ev.offsetY;
 
             // x, y coordinates in the gl viewport
-            // This should handle the pixelRatio. I need to find a way to do that.
-            customEvent.glX = customEvent.canvasX;
-            customEvent.glY = this._target.clientHeight - customEvent.canvasY;
+            var ratio = this._inputManager.getParam('pixelRatio');
+            if (!ratio) ratio = 1.0;
+            customEvent.glX = customEvent.canvasX * ratio;
+            customEvent.glY = (this._target.clientHeight - customEvent.canvasY) * ratio;
 
             customEvent.clientX = ev.clientX;
             customEvent.clientY = ev.clientY;
@@ -80,13 +80,14 @@ utils.createPrototypeObject(
             customEvent.buttons = ev.buttons;
 
             if (this._isMouseWheelEvent(ev)) {
-                if( ev.deltaMode !== undefined ) {
+                if (ev.deltaMode !== undefined) {
                     customEvent.deltaMode = ev.deltaMode;
                     customEvent.deltaY = ev.deltaY;
                     customEvent.deltaX = ev.deltaX;
                     customEvent.deltaZ = ev.deltaZ;
                 } else {
-                    customEvent.wheelDelta = ev.wheelDelta === undefined ? -ev.detail : ev.wheelDelta;
+                    customEvent.wheelDelta =
+                        ev.wheelDelta === undefined ? -ev.detail : ev.wheelDelta;
                     customEvent.deltaMode = 0;
                     customEvent.deltaY = -ev.wheelDelta / 3;
                     customEvent.deltaX = 0;
@@ -95,7 +96,7 @@ utils.createPrototypeObject(
             }
         },
 
-        _isMouseWheelEvent(ev) {
+        _isMouseWheelEvent: function(ev) {
             return (
                 ev.type === 'wheel' ||
                 ev.type === 'DOMMouseScroll' ||
@@ -105,32 +106,31 @@ utils.createPrototypeObject(
         },
 
         matches: function(nativeEvent, parsedEvent) {
-            if (!parsedEvent.action){
+            if (!parsedEvent.action) {
                 return true;
             }
-            if(nativeEvent.button !== parseInt(parsedEvent.action)) {
+            if (nativeEvent.button !== parseInt(parsedEvent.action)) {
                 return false;
             }
-            if(nativeEvent.ctrlKey !== !!parsedEvent.ctrl){
+            if (nativeEvent.ctrlKey !== !!parsedEvent.ctrl) {
                 //console.log('ctrl no match');
                 return false;
             }
-            if(nativeEvent.shiftKey !== !!parsedEvent.shift){
+            if (nativeEvent.shiftKey !== !!parsedEvent.shift) {
                 //console.log('shift no match');
                 return false;
             }
-            if(nativeEvent.altKey !== !!parsedEvent.alt){
+            if (nativeEvent.altKey !== !!parsedEvent.alt) {
                 //console.log('alt no match');
                 return false;
             }
-            if(nativeEvent.metaKey !== !!parsedEvent.meta){
+            if (nativeEvent.metaKey !== !!parsedEvent.meta) {
                 //console.log('meta no match');
                 return false;
             }
 
             return true;
         }
-
     }),
     'osgViewer',
     'InputSourceMouse'

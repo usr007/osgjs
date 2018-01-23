@@ -34,8 +34,7 @@ utils.createPrototypeObject(
                 this._manipulator.getZoomInterpolator()
             );
 
-
-            manager.group(Groups.ORBIT_MANIPULATOR_MOUSEKEYBARD).addMappings(
+            manager.group(Groups.ORBIT_MANIPULATOR_MOUSEKEYBOARD).addMappings(
                 {
                     motion: 'mousemove',
                     startPan: ['mousedown shift 0', 'mousedown 1', 'mousedown 2'],
@@ -49,23 +48,14 @@ utils.createPrototypeObject(
             );
 
             manager
-                .group('scene.manipulators.orbit.mousekeyboard')
+                .group(Groups.ORBIT_MANIPULATOR_MOUSEKEYBOARD)
                 .addMappings({ setRotationMode: 'keydown a' }, setRotationMode);
             manager
-                .group('scene.manipulators.orbit.mousekeyboard')
+                .group(Groups.ORBIT_MANIPULATOR_MOUSEKEYBOARD)
                 .addMappings({ setPanMode: 'keydown d' }, setPanMode);
             manager
-                .group('scene.manipulators.orbit.mousekeyboard')
+                .group(Groups.ORBIT_MANIPULATOR_MOUSEKEYBOARD)
                 .addMappings({ setZoomMode: 'keydown s' }, setZoomMode);
-        },
-
-        // called to enable/disable controller
-        setEnable: function(bool) {
-            if (!bool) {
-                // reset mode if we disable it
-                this._mode = undefined;
-            }
-            Controller.prototype.setEnable.call(this, bool);
         },
 
         getMode: function() {

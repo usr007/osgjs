@@ -22,7 +22,7 @@ var InputSourceTouchScreen = function(canvas) {
         'doubletap2fingers',
         'singletap'
     ];
-    this._supportedEvents = ['touchstart', 'touchend', 'touchcancel'];
+    this._supportedEvents = ['touchstart', 'touchend', 'touchcancel', 'touchmove'];
 
     this._hammer = new Hammer.Manager(canvas);
 
@@ -109,7 +109,7 @@ utils.createPrototypeObject(
             }
         },
 
-        populateEvent(ev, customEvent) {
+        populateEvent: function(ev, customEvent) {
             if (this._isNativeEvent(ev.type)) {
                 //native event
                 customEvent.canvasX = customEvent.canvasY = 0;
@@ -142,14 +142,20 @@ utils.createPrototypeObject(
             var offset = this._target.getBoundingClientRect();
             customEvent.canvasX += -offset.left;
             customEvent.canvasX += -offset.top;
+
+            // x, y coordinates in the gl viewport
+            var ratio = this._inputManager.getParam('pixelRatio');
+            if (!ratio) ratio = 1.0;
+            customEvent.glX = customEvent.canvasX * ratio;
+            customEvent.glY = (this._target.clientHeight - customEvent.canvasY) * ratio;
         },
 
         _isNativeEvent: function(evt) {
-            return evt === 'touchstart' || evt === 'touchend' || evt === 'touchcancel';
+            return this._supportedEvents.indexOf(evt) >= 0;
         },
 
         matches: function(nativeEvent, parsedEvent) {
-            if(nativeEvent.pointerType && nativeEvent.pointerType !== 'touch'){
+            if (nativeEvent.pointerType && nativeEvent.pointerType !== 'touch') {
                 return false;
             }
 
@@ -168,7 +174,7 @@ utils.createPrototypeObject(
 
             var nbTouches = parseInt(parsedEvent.action);
 
-            if (nativeEvent.type === 'touchend' || nativeEvent.type === 'touchcancel'){
+            if (nativeEvent.type === 'touchend' || nativeEvent.type === 'touchcancel') {
                 //on touch end the number of touches will always be below the requested number of touches
                 if (touches.length >= nbTouches) {
                     return false;
@@ -178,7 +184,6 @@ utils.createPrototypeObject(
                     return false;
                 }
             }
-
 
             return true;
         },

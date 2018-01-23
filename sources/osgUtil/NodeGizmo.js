@@ -11,11 +11,12 @@ import LineSegmentIntersector from 'osgUtil/LineSegmentIntersector';
 import GizmoGeometry from 'osgUtil/gizmoGeometry';
 import TransformEnums from 'osg/transformEnums';
 import utils from 'osg/utils';
+import Groups from 'osgViewer/input/InputConstants';
 
-var getCanvasCoord = function(vec, e) {
-    vec[0] = e.offsetX === undefined ? e.layerX : e.offsetX;
-    vec[1] = e.offsetY === undefined ? e.layerY : e.offsetY;
-};
+// var getCanvasCoord = function(vec, e) {
+//     vec[0] = e.canvasX;
+//     vec[1] = e.canvasY;
+// };
 
 var HideCullCallback = function() {};
 HideCullCallback.prototype = {
@@ -252,11 +253,17 @@ utils.createPrototypeNode(
                 this._debugNode.setNodeMask(0x0);
             }
 
-            var canvas = this._canvas;
-            canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
-            canvas.addEventListener('mousedown', this.onMouseDown.bind(this));
-            canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
-            canvas.addEventListener('mouseout', this.onMouseUp.bind(this));
+            var manager = this._viewer.getInputManager();
+
+            manager.group(Groups.NODE_GIZMO).addMappings(
+                {
+                    onMouseMove: 'mousemove',
+                    onMouseDown: 'mousedown',
+                    onMouseUp: ['mouseup', 'mouseout']
+                },
+                this
+            );
+            manager.setPriority(Groups.NODE_GIZMO, manager.getHigherPriority(Groups.MANIPULATORS));
         },
 
         _insertEditNode: function(parent, node) {
@@ -736,7 +743,6 @@ utils.createPrototypeNode(
                 }
 
                 this.updateArcRotation(eye);
-
                 this._rotateNode.dirtyBound();
                 this._translateNode.dirtyBound();
                 this._planeNode.dirtyBound();
@@ -751,17 +757,15 @@ utils.createPrototypeNode(
             var sortByRatio = function(a, b) {
                 return a._ratio - b._ratio;
             };
-            var coord = vec2.create();
 
             return function(e, tmask) {
-                getCanvasCoord(coord, e);
-
                 // canvas to webgl coord
                 var viewer = this._viewer;
                 var canvas = this._canvas;
-                var x = coord[0] * (viewer._canvasWidth / canvas.clientWidth);
+                var x = e.canvasX * (viewer._canvasWidth / canvas.clientWidth);
                 var y =
-                    (canvas.clientHeight - coord[1]) * (viewer._canvasHeight / canvas.clientHeight);
+                    (canvas.clientHeight - e.canvasY) *
+                    (viewer._canvasHeight / canvas.clientHeight);
 
                 var hits = this._viewer.computeIntersections(x, y, tmask);
 
@@ -824,10 +828,8 @@ utils.createPrototypeNode(
         })(),
 
         onMouseDown: function(e) {
-            getCanvasCoord(this._downCanvasCoord, e);
+            vec2.set(this._downCanvasCoord, e.canvasX, e.canvasY);
             if (!this._hoverNode || !this._attachedNode) return;
-
-            e.preventDefault();
 
             this._viewer.setEnableManipulator(false);
 
@@ -901,7 +903,8 @@ utils.createPrototypeNode(
                 .getUniform('uBase')
                 .setVec3(vec3.normalize(hit._localIntersectionPoint, hit._localIntersectionPoint));
 
-            getCanvasCoord(this._editLineOrigin, e);
+            this._editLineOrigin[0] = e.canvasX;
+            this._editLineOrigin[1] = e.canvasY;
         },
 
         startTranslateEdit: function(e) {
@@ -929,7 +932,7 @@ utils.createPrototypeNode(
             vec2.normalize(dir, dir);
 
             var offset = this._editOffset;
-            getCanvasCoord(offset, e);
+            vec2.set(offset, e.canvasX, e.canvasY);
             vec2.sub(offset, offset, origin);
         },
 
@@ -944,7 +947,7 @@ utils.createPrototypeNode(
             this.getCanvasPositionFromWorldPoint(origin, origin);
 
             var offset = this._editOffset;
-            getCanvasCoord(offset, e);
+            vec2.set(offset, e.canvasX, e.canvasY);
             vec2.sub(offset, offset, origin);
         },
 
@@ -970,8 +973,8 @@ utils.createPrototypeNode(
             this._viewer.setEnableManipulator(true);
             if (this._debugNode) this._debugNode.setNodeMask(0x0);
 
-            var v = vec2.create();
-            getCanvasCoord(v, e);
+            var v = vec2.fromValues(e.canvasX, e.canvasY);
+
             if (vec2.distance(v, this._downCanvasCoord) === 0.0) this.pickAndSelect(e);
 
             this._showAngle.setNodeMask(0x0);
@@ -1009,7 +1012,7 @@ utils.createPrototypeNode(
                 var origin = this._editLineOrigin;
                 var dir = this._editLineDirection;
 
-                getCanvasCoord(vec, e);
+                vec2.set(vec, e.canvasX, e.canvasY);
                 vec2.sub(vec, vec, origin);
                 var dist = vec2.dot(vec, dir);
 
@@ -1055,7 +1058,7 @@ utils.createPrototypeNode(
                 var origin = this._editLineOrigin;
                 var dir = this._editLineDirection;
 
-                getCanvasCoord(vec, e);
+                vec2.set(vec, e.canvasX, e.canvasY);
                 vec2.sub(vec, vec, origin);
                 vec2.sub(vec, vec, this._editOffset);
 
@@ -1112,7 +1115,7 @@ utils.createPrototypeNode(
             var tra = vec3.create();
 
             return function(e) {
-                getCanvasCoord(vec, e);
+                vec2.set(vec, e.canvasX, e.canvasY);
                 vec2.sub(vec, vec, this._editOffset);
 
                 // canvas to webgl coord

@@ -28,7 +28,7 @@ import InputSourceKeyboard from 'osgViewer/input/source/InputSourceKeyboard';
 import InputSourceWebVR from 'osgViewer/input/source/InputSourceWebVR';
 import InputSourceGamePad from 'osgViewer/input/source/InputSourceGamePad';
 import InputSourceDeviceOrientation from 'osgViewer/input/source/InputSourceDeviceOrientation';
-import InputSourceTouchScreen from 'osgViewer/input/source/InputSourceTouchScreen'
+import InputSourceTouchScreen from 'osgViewer/input/source/InputSourceTouchScreen';
 
 var Viewer = function(canvas, userOptions, error) {
     View.call(this);
@@ -121,7 +121,7 @@ utils.createPrototypeObject(
                 }.bind(this)
             );
 
-            inputManager.setEnable('viewer.internals', true);
+            inputManager.setParam('pixelRatio', this._devicePixelRatio);
         },
 
         getInputManager: function() {
