@@ -938,24 +938,19 @@ ReaderWriterGLTF.prototype = {
         var fileType = FileHelper.getTypeForExtension(ext);
         var isImage = FileHelper.isImage(ext);
         var url = this._localPath + uri;
+        var data = this._filesMap.get(uri);
 
         if (isImage) {
-            if (this._filesMap.has(uri)) {
-                if (fileType === 'blob') {
-                    return FileHelper.createImageFromBlob(this._filesMap.get(uri), uri);
-                } else {
-                    notify.warn('image type ' + uri + ' not recognized');
-                }
-            } else {
-                return this._inputReader.readImageURL(url, {
-                    imageLoadingUsePromise: true
-                });
+            if (data instanceof window.Blob) {
+                return FileHelper.createImageFromBlob(data, uri);
             }
-        } else if (fileType === 'arraybuffer') {
-            if (this._filesMap.has(uri)) {
-                return this._filesMap.get(uri);
+            return this._inputReader.readImageURL(url, {
+                imageLoadingUsePromise: true
+            });
+        } else {
+            if (data instanceof window.Blob) {
+                return FileHelper.createArrayBufferFromBlob(data);
             }
-
             return this._inputReader.readBinaryArrayURL(url, {
                 fileType: fileType
             });
