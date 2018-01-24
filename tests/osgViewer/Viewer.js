@@ -2,8 +2,10 @@ import { assert } from 'chai';
 import mockup from 'tests/mockup/mockup';
 import Shape from 'osg/shape';
 
+
 export default function() {
     test('Viewer', function() {
+
         (function() {
             var canvas = mockup.createCanvas();
             var viewer = new mockup.Viewer(canvas);

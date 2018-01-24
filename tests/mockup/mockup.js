@@ -357,6 +357,7 @@ var Viewer = function() {
     ViewerOriginal.apply(this, arguments);
 };
 
+
 Utils.createPrototypeObject(
     Viewer,
     Utils.objectInherit(ViewerOriginal.prototype, {
