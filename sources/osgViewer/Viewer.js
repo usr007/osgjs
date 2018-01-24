@@ -46,11 +46,10 @@ var Viewer = function(canvas, userOptions, error) {
 
     if (!gl) throw 'No WebGL implementation found';
 
-    //this.initDeviceEvents(options, canvas);
-    this.initInputManager(options, canvas);
     this._updateVisitor = new UpdateVisitor();
 
     this.setUpView(gl.canvas, options);
+    this.initInputManager(options, canvas);
     this.initStats(options, canvas);
 
     this._hmd = null;
@@ -109,8 +108,11 @@ utils.createPrototypeObject(
             }
 
             inputManager.registerInputSource(new InputSourceWebVR());
-            inputManager.registerInputSource(new InputSourceGamePad());
             inputManager.registerInputSource(new InputSourceDeviceOrientation());
+
+            if (navigator.getGamepads) {
+                inputManager.registerInputSource(new InputSourceGamePad());
+            }
 
             this._inputManager = inputManager;
 
