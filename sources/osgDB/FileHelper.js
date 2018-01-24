@@ -7,39 +7,113 @@ import notify from 'osg/notify';
 
 var zip = window.zip;
 
-var isImages = ['png', 'jpg', 'jpeg', 'gif'];
+var typesMap = new window.Map();
+var mimeTypes = new window.Map();
 
-// Drag'n Drop file helper
-// it also holds a list of basic types per extension to do requests.
+var createImageFromURL = function(url) {
+    var img = new window.Image();
+    img.src = url;
+    return new P(function(resolve, reject) {
+        img.onerror = function() {
+            reject(img);
+        };
+
+        img.onload = function() {
+            resolve(img);
+        };
+    });
+};
+
+var createImageFromBlob = function(blob) {
+    var privateURL = window.URL.createObjectURL(blob);
+    var promise = createImageFromURL(privateURL);
+
+    promise.finally(function() {
+        window.URL.revokeObjectURL(privateURL);
+    });
+    return promise;
+};
+
+var createArrayBufferFromBlob = function(blob) {
+    return new P(function(resolve, reject) {
+        var fr = new window.FileReader();
+
+        fr.onerror = function() {
+            reject(fr);
+        };
+
+        fr.onload = function() {
+            resolve(this.result);
+        };
+        fr.readAsArrayBuffer(blob);
+    });
+};
+
+var createArrayBufferFromURL = function(url) {
+    return requestFile(url, {
+        responseType: 'arraybuffer'
+    });
+};
+
+var createJSONFromURL = function(url) {
+    return requestFile(url).then(function(string) {
+        return JSON.parse(string);
+    });
+};
+
+var imageResolver = {
+    blob: createImageFromBlob,
+    url: createImageFromURL
+};
+
+var JSONResolver = {
+    string: function(str) {
+        return P.resolve(JSON.parse(str));
+    }
+};
+
+var arrayBufferResolver = {
+    blob: createArrayBufferFromBlob,
+    url: createArrayBufferFromURL
+};
+
 var FileHelper = {
-    createImageFromBlob: function(blob, url) {
-        var privateURL = window.URL.createObjectURL(blob);
-        var promise = readerParser.readImageURL(privateURL);
-        if (url) {
-            promise.then(function(osgjsImage) {
-                osgjsImage.setURL(url);
-            });
-        }
-        promise.finally(function() {
-            window.URL.revokeObjectURL(privateURL);
+    createJSONFromURL: createJSONFromURL,
+    createArrayBufferFromURL: createArrayBufferFromURL,
+    createArrayBufferFromBlob: createArrayBufferFromBlob,
+    createImageFromBlob: createImageFromBlob,
+    createImageFromURL: createImageFromURL,
+
+    resolveFilesMap: function(filesMap) {
+        var promises = [];
+
+        filesMap.forEach(function(data, filename) {
+            var extension = FileHelper.getExtension(filename);
+            var mimetype = FileHelper.getMimeType(extension);
+
+            var createData;
+            if (mimetype.match('image')) {
+                if (data instanceof String) createData = imageResolver.url;
+                else if (data instanceof window.Blob) createData = imageResolver.blob;
+            } else if (mimetype.match('json')) {
+                createData = JSONResolver.string;
+            } else if (mimetype.match('octet-binary')) {
+                if (data instanceof String) createData = arrayBufferResolver.url;
+                else if (data instanceof window.Blob) createData = arrayBufferResolver.blob;
+            }
+
+            var promise;
+            if (createData) {
+                promise = createData(data).then(function(dataResolved) {
+                    filesMap[filesMap] = dataResolved;
+                });
+            } else {
+                promise = P.resolve(data);
+            }
+            promises.push(promise);
         });
 
-        return promise;
-    },
-
-    createArrayBufferFromBlob: function(blob) {
-        return new P(function(resolve, reject) {
-            var fr = new FileReader();
-
-            fr.onerror = function() {
-                reject(fr);
-            };
-
-            fr.onload = function() {
-                resolve(this.result);
-            };
-            fr.readAsArrayBuffer(blob);
-        });
+        return P.all(promises);
     },
 
     _unzipEntry: function(entry) {
@@ -49,10 +123,8 @@ var FileHelper = {
             var mimetype = FileHelper.getMimeType(extension);
 
             var Writer = zip.BlobWriter;
-            if (mimetype.match('text') !== null) {
+            if (mimetype.match('text') !== null || mimetype.match('json') !== null)
                 Writer = zip.TextWriter;
-            }
-
             // get data from the first file
             entry.getData(new Writer(mimetype), function(data) {
                 resolve({
@@ -85,7 +157,8 @@ var FileHelper = {
 
                         P.all(filePromises).then(function() {
                             zipReader.close();
-                            resolve(content);
+                            return resolve(content);
+                            //return FileHelper.resolveFilesMap(content);
                         });
                     });
                 },
@@ -134,51 +207,12 @@ var FileHelper = {
         });
     },
 
-    // Adds basic types
-    init: function() {
-        FileHelper._typesMap = new window.Map();
-        // Binary
-        FileHelper._typesMap.set('bin', 'arraybuffer');
-        FileHelper._typesMap.set('b3dm', 'arraybuffer');
-        FileHelper._typesMap.set('glb', 'arraybuffer');
-        FileHelper._typesMap.set('zip', 'arraybuffer');
-        // Image
-        FileHelper._typesMap.set('png', 'blob');
-        FileHelper._typesMap.set('jpg', 'blob');
-        FileHelper._typesMap.set('jpeg', 'blob');
-        FileHelper._typesMap.set('gif', 'blob');
-        // Text
-        FileHelper._typesMap.set('json', 'string');
-        FileHelper._typesMap.set('gltf', 'string');
-        FileHelper._typesMap.set('osgjs', 'string');
-        FileHelper._typesMap.set('txt', 'string');
-
-        FileHelper._mimeTypes = new window.Map();
-        FileHelper._mimeTypes.set('bin', 'application/octet-binary');
-        FileHelper._mimeTypes.set('b3dm', 'application/octet-binary');
-        FileHelper._mimeTypes.set('glb', 'application/octet-binary');
-        FileHelper._mimeTypes.set('zip', 'application/octet-binary');
-        // Image
-        FileHelper._mimeTypes.set('png', 'image/png');
-        FileHelper._mimeTypes.set('jpg', 'image/jpeg');
-        FileHelper._mimeTypes.set('jpeg', 'image/jpeg');
-        FileHelper._mimeTypes.set('gif', 'image/gif');
-        // Text
-        FileHelper._mimeTypes.set('json', 'text/plain');
-        FileHelper._mimeTypes.set('gltf', 'text/plain');
-        FileHelper._mimeTypes.set('osgjs', 'text/plain');
-        FileHelper._mimeTypes.set('txt', 'text/plain');
-    },
-
     isImage: function(extension) {
-        return isImages.indexOf(extension) !== -1;
+        return mimeTypes.get(extension).match('image') !== null;
     },
 
     getMimeType: function(extension) {
-        if (!FileHelper._typesMap) {
-            FileHelper.init();
-        }
-        return FileHelper._mimeTypes.get(extension);
+        return mimeTypes.get(extension);
     },
 
     getExtension: function(url) {
@@ -187,19 +221,47 @@ var FileHelper = {
 
     // To add user defined types
     addTypeForExtension: function(type, extension) {
-        if (!FileHelper._typesMap) FileHelper.init();
-        if (FileHelper._typesMap.get(extension) !== undefined) {
+        if (typesMap.get(extension) !== undefined) {
             notify.warn("the '" + extension + "' already has a type");
         }
-        FileHelper._typesMap.set(extension, type);
+        typesMap.set(extension, type);
     },
 
     getTypeForExtension: function(extension) {
-        if (!FileHelper._typesMap) {
-            FileHelper.init();
-        }
-        return this._typesMap.get(extension);
+        return typesMap.get(extension);
     }
 };
+
+// Binary
+typesMap.set('bin', 'arraybuffer');
+typesMap.set('b3dm', 'arraybuffer');
+typesMap.set('glb', 'arraybuffer');
+typesMap.set('zip', 'arraybuffer');
+// Image
+typesMap.set('png', 'blob');
+typesMap.set('jpg', 'blob');
+typesMap.set('jpeg', 'blob');
+typesMap.set('gif', 'blob');
+// Text
+typesMap.set('json', 'string');
+typesMap.set('gltf', 'string');
+typesMap.set('osgjs', 'string');
+typesMap.set('txt', 'string');
+
+mimeTypes.set('bin', 'application/octet-binary');
+mimeTypes.set('b3dm', 'application/octet-binary');
+mimeTypes.set('glb', 'application/octet-binary');
+mimeTypes.set('zip', 'application/octet-binary');
+mimeTypes.set('gz', 'application/octet-binary');
+// Image
+mimeTypes.set('png', 'image/png');
+mimeTypes.set('jpg', 'image/jpeg');
+mimeTypes.set('jpeg', 'image/jpeg');
+mimeTypes.set('gif', 'image/gif');
+// Text
+mimeTypes.set('json', 'application/json');
+mimeTypes.set('gltf', 'text/plain');
+mimeTypes.set('osgjs', 'text/plain');
+mimeTypes.set('txt', 'text/plain');
 
 export default FileHelper;
