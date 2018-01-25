@@ -39,7 +39,7 @@ utils.createPrototypeObject(
                 }
                 this._timerRef = setTimeout(function() {
                     that._timer = false;
-                }, 200);
+                }, 1000);
                 manipulator.computeIntersections(ev.glX, ev.glY);
             }
         },

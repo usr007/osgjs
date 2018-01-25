@@ -19,8 +19,7 @@ utils.createPrototypeObject(
 
         setEnable: function(name, callback, enable) {
             if (enable) {
-                window.addEventListener(name, callback);
-                //this._target
+                this._target.addEventListener(name, callback);
             } else {
                 this._target.removeEventListener(name, callback);
             }

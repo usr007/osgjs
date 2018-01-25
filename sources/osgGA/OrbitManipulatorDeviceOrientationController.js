@@ -15,7 +15,6 @@ utils.createPrototypeObject(
     OrbitManipulatorDeviceOrientationController,
     utils.objectInherit(Controller.prototype, {
         init: function() {
-            this._stepFactor = 1.0; // meaning radius*stepFactor to move
             this._quat = quat.create();
             this._pos = vec3.create();
 
@@ -40,15 +39,23 @@ utils.createPrototypeObject(
                 this._deviceOrientation = {};
             }
             this._deviceOrientation.alpha = ev.alpha;
-            this._deviceOrientation.beta = ev.alpha;
-            this._deviceOrientation.gamma = ev.alpha;
+            this._deviceOrientation.beta = ev.beta;
+            this._deviceOrientation.gamma = ev.gamma;
+
+            if (ev.screenOrientation) {
+                this.setScreenOrientation(ev);
+                return;
+            }
+
+            this._update();
         },
 
         setScreenOrientation: function(ev) {
-            this._deviceOrientation = ev.screenOrientation;
+            this._screenOrientation = ev.screenOrientation;
+            this._update();
         },
 
-        update: function() {
+        _update: function() {
             if (!this._deviceOrientation || !this._screenOrientation) {
                 return;
             }
