@@ -231,6 +231,16 @@ InputManager.prototype = {
         return parsedEvent;
     },
 
+    getInputSource: function(name) {
+        for (var i = 0; i < this._sources.length; i++) {
+            var source = this._sources[i];
+            if (source.getName() === name) {
+                return source;
+            }
+        }
+        return undefined;
+    },
+
     group: function(name) {
         return this._getOrCreateGroup(name);
     },

@@ -351,21 +351,13 @@ var createAnimationUpdateCallback = function(animations) {
     return cbMap;
 };
 
-// override initEventProxy because no events/no canvas in nodejs context
-// but keep the same class if in browser context
 var Viewer = function() {
     ViewerOriginal.apply(this, arguments);
 };
 
-
 Utils.createPrototypeObject(
     Viewer,
     Utils.objectInherit(ViewerOriginal.prototype, {
-        initEventProxy: function() {
-            if (isNodeContext()) return {};
-
-            return ViewerOriginal.prototype.initEventProxy.apply(this, arguments);
-        }
     })
 );
 

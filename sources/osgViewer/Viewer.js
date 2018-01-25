@@ -14,7 +14,6 @@ import Shader from 'osg/Shader';
 import Program from 'osg/Program';
 import Texture from 'osg/Texture';
 import OrbitManipulator from 'osgGA/OrbitManipulator';
-import EventProxy from 'osgViewer/eventProxy/eventProxy';
 import View from 'osgViewer/View';
 import WebGLUtils from 'osgViewer/webgl-utils';
 import WebGLDebugUtils from 'osgViewer/webgl-debug';
@@ -63,31 +62,6 @@ var Viewer = function(canvas, userOptions, error) {
 utils.createPrototypeObject(
     Viewer,
     utils.objectInherit(View.prototype, {
-        initDeviceEvents: function(options, canvas) {
-            // default argument for mouse binding
-            var defaultMouseEventNode = options.mouseEventNode || canvas;
-
-            var eventsBackend = options.EventBackend || {};
-            if (!options.EventBackend) options.EventBackend = eventsBackend;
-            eventsBackend.StandardMouseKeyboard = options.EventBackend.StandardMouseKeyboard || {};
-            var mouseEventNode =
-                eventsBackend.StandardMouseKeyboard.mouseEventNode || defaultMouseEventNode;
-            eventsBackend.StandardMouseKeyboard.mouseEventNode = mouseEventNode;
-            eventsBackend.StandardMouseKeyboard.keyboardEventNode =
-                eventsBackend.StandardMouseKeyboard.keyboardEventNode || document;
-
-            // hammer, Only activate it if we have a touch device in order to fix problems with IE11
-            if ('ontouchstart' in window) {
-                eventsBackend.Hammer = eventsBackend.Hammer || {};
-                eventsBackend.Hammer.eventNode =
-                    eventsBackend.Hammer.eventNode || defaultMouseEventNode;
-            }
-
-            // gamepad
-            eventsBackend.GamePad = eventsBackend.GamePad || {};
-
-            this._eventProxy = this.initEventProxy(options);
-        },
 
         initInputManager: function(options, canvas) {
             //Maybe offer a better way to tweak this...
@@ -444,8 +418,7 @@ utils.createPrototypeObject(
             // update viewport if a resize occured
             var canvasSizeChanged = this.updateViewport();
 
-            // update inputs devices
-            //this.updateEventProxy(this._eventProxy, this.getFrameStamp());
+            // update inputs
             this._inputManager.update();
 
             // setup framestamp
@@ -577,66 +550,6 @@ utils.createPrototypeObject(
             return true;
         },
 
-        // intialize all input devices
-        initEventProxy: function(argsObject) {
-            var args = argsObject || {};
-            var deviceEnabled = {};
-
-            var lists = EventProxy;
-            var argumentEventBackend = args.EventBackend;
-
-            // loop on each devices and try to initialize it
-            for (var device in lists) {
-                // check if the config has a require
-                var initialize = true;
-                var argDevice = {};
-                if (argumentEventBackend && argumentEventBackend[device] !== undefined) {
-                    var bool = argumentEventBackend[device].enable;
-                    initialize = bool !== undefined ? bool : true;
-                    argDevice = argumentEventBackend[device];
-                }
-
-                // extend argDevice with regular options eg:
-                // var options = {
-                //     EventBackend: {
-                //         Hammer: {
-                //             drag_max_touches: 4,
-                //             transform_min_scale: 0.08,
-                //             transform_min_rotation: 180,
-                //             transform_always_block: true
-                //         }
-                //     },
-                //     zoomscroll: false
-                // };
-
-                // to options merged:
-                // var options = {
-                //     drag_max_touches: 4,
-                //     transform_min_scale: 0.08,
-                //     transform_min_rotation: 180,
-                //     transform_always_block: true,
-                //     zoomscroll: false
-                // };
-                //
-                var options = new Options();
-                options.extend(argDevice).extend(argsObject);
-                delete options.EventBackend;
-
-                if (initialize) {
-                    var inputDevice = new lists[device](this);
-                    inputDevice.init(options);
-                    deviceEnabled[device] = inputDevice;
-                }
-            }
-            return deviceEnabled;
-        },
-        updateEventProxy: function(list, frameStamp) {
-            for (var key in list) {
-                var device = list[key];
-                if (device.update) device.update(frameStamp);
-            }
-        },
-
         setManipulator: function(manipulator) {
             this.setEnableManipulator(false);
 
@@ -651,17 +564,6 @@ utils.createPrototypeObject(
             this._manipulator.setEnable(bool);
         },
 
-        removeEventProxy: function() {
-            var list = this._eventProxy;
-            for (var key in list) {
-                var device = list[key];
-                if (device.remove) device.remove();
-            }
-        },
-
-        getEventProxy: function() {
-            return this._eventProxy;
-        }
     }),
     'osgViewer',
     'Viewer'

@@ -59,26 +59,18 @@ export default function() {
         })();
 
         // test device
-        if (!mockup.isNodeContext()) {
-            (function() {
-                var canvas = mockup.createCanvas();
-                var viewer = new mockup.Viewer(canvas);
-                var args = {
-                    devices: {
-                        Mouse: {
-                            eventNode: canvas
-                        }
-                    }
-                };
-                var list = viewer.initEventProxy(args);
+        (function() {
+            var canvas = mockup.createCanvas();
+            var viewer = new mockup.Viewer(canvas);
 
-                assert.notEqual(list.StandardMouseKeyboard, undefined, 'detected mouse');
+            var mouseInput = viewer.getInputManager().getInputSource('Mouse');
+            var keyboardInput = viewer.getInputManager().getInputSource('Keyboard');
 
-                viewer.updateEventProxy(list, undefined);
+            assert.notEqual(mouseInput, undefined, 'detected mouse');
+            assert.notEqual(keyboardInput, undefined, 'detected keyboard');
 
-                mockup.removeCanvas(canvas);
-            })();
-        }
+            mockup.removeCanvas(canvas);
+        })();
 
         // test context lost
         (function() {
