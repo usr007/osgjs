@@ -13,10 +13,16 @@ utils.createPrototypeObject(
     OrbitManipulatorStandardMouseKeyboardController,
     utils.objectInherit(Controller.prototype, {
         init: function() {
-            this._delay = 0.15;
             this._mode = undefined;
             this._inMotion = false;
 
+            this._initInputs(
+                Groups.ORBIT_MANIPULATOR_MOUSEKEYBOARD,
+                Groups.ORBIT_MANIPULATOR_RESETTOHOME
+            );
+        },
+
+        _initInputs: function(globalGroup, resetToHomeGroup) {
             var manager = this._manipulator.getInputManager();
             var setRotationMode = this.changeMode.bind(
                 this,
@@ -34,28 +40,30 @@ utils.createPrototypeObject(
                 this._manipulator.getZoomInterpolator()
             );
 
-            manager.group(Groups.ORBIT_MANIPULATOR_MOUSEKEYBOARD).addMappings(
+            manager.group(globalGroup).addMappings(
                 {
                     motion: 'mousemove',
                     startPan: ['mousedown shift 0', 'mousedown 1', 'mousedown 2'],
                     startZoom: ['mousedown ctrl 0', 'mousedown ctrl 2'],
                     startRotate: 'mousedown 0',
                     stopMotion: ['mouseup', 'mouseout', 'keyup a', 'keyup s', 'keyup d'],
-                    zoom: 'wheel',
+                    zoom: 'wheel'
+                },
+                this
+            );
+
+            manager.group(resetToHomeGroup).addMappings(
+                {
                     resetToHome: 'keydown space'
                 },
                 this
             );
 
             manager
-                .group(Groups.ORBIT_MANIPULATOR_MOUSEKEYBOARD)
+                .group(globalGroup)
                 .addMappings({ setRotationMode: 'keydown a' }, setRotationMode);
-            manager
-                .group(Groups.ORBIT_MANIPULATOR_MOUSEKEYBOARD)
-                .addMappings({ setPanMode: 'keydown d' }, setPanMode);
-            manager
-                .group(Groups.ORBIT_MANIPULATOR_MOUSEKEYBOARD)
-                .addMappings({ setZoomMode: 'keydown s' }, setZoomMode);
+            manager.group(globalGroup).addMappings({ setPanMode: 'keydown d' }, setPanMode);
+            manager.group(globalGroup).addMappings({ setZoomMode: 'keydown s' }, setZoomMode);
         },
 
         getMode: function() {
@@ -82,7 +90,6 @@ utils.createPrototypeObject(
             if (osgMath.isNaN(posX) === false && osgMath.isNaN(posY) === false) {
                 var mode = this.getMode();
                 if (mode === OrbitManipulatorEnums.ROTATE) {
-                    manipulator.getRotateInterpolator().setDelay(this._delay);
                     manipulator.getRotateInterpolator().setTarget(posX, posY);
                 } else if (mode === OrbitManipulatorEnums.PAN) {
                     manipulator.getPanInterpolator().setTarget(posX, posY);

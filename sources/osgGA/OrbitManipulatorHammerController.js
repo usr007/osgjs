@@ -1,7 +1,7 @@
 import Controller from 'osgGA/Controller';
 import utils from 'osg/utils';
 import osgMath from 'osg/math';
-import Groups from '../osgViewer/input/InputConstants';
+import Groups from 'osgViewer/input/InputConstants';
 
 var OrbitManipulatorHammerController = function(manipulator) {
     Controller.call(this, manipulator);
@@ -22,19 +22,20 @@ utils.createPrototypeObject(
             this._zoomFactor = 5.0;
 
             this._lastScale = 0;
-            this._nbPointerLast = 0; // to check if we the number of pointers has changed
-            this._delay = 0.15;
 
             this._zooming = false;
             this._dragStarted = false;
 
+            this._initInputs(Groups.ORBIT_MANIPULATOR_TOUCH);
+        },
+
+        _initInputs: function(group) {
             var rotateInterpolator = this._manipulator.getRotateInterpolator();
-            rotateInterpolator.setDelay(this._delay);
             var panInterpolator = this._manipulator.getPanInterpolator();
 
             var manager = this._manipulator.getInputManager();
 
-            manager.group(Groups.ORBIT_MANIPULATOR_TOUCH).addMappings(
+            manager.group(group).addMappings(
                 {
                     pinchEnd: 'pinchend',
                     pinchStart: 'pinchstart',
@@ -43,42 +44,42 @@ utils.createPrototypeObject(
                 this
             );
 
-            manager.group(Groups.ORBIT_MANIPULATOR_TOUCH).addMappings(
+            manager.group(group).addMappings(
                 {
                     startPan: 'panstart 2'
                 },
                 this.startMotion.bind(this, panInterpolator, this._panFactor)
             );
 
-            manager.group(Groups.ORBIT_MANIPULATOR_TOUCH).addMappings(
+            manager.group(group).addMappings(
                 {
                     startRotate: 'panstart 1'
                 },
                 this.startMotion.bind(this, rotateInterpolator, this._rotateFactor)
             );
 
-            manager.group(Groups.ORBIT_MANIPULATOR_TOUCH).addMappings(
+            manager.group(group).addMappings(
                 {
                     pan: 'panmove 2'
                 },
                 this.motion.bind(this, panInterpolator, this._panFactor)
             );
 
-            manager.group(Groups.ORBIT_MANIPULATOR_TOUCH).addMappings(
+            manager.group(group).addMappings(
                 {
                     rotate: 'panmove 1'
                 },
                 this.motion.bind(this, rotateInterpolator, this._rotateFactor)
             );
 
-            manager.group(Groups.ORBIT_MANIPULATOR_TOUCH).addMappings(
+            manager.group(group).addMappings(
                 {
                     endPan: ['touchend 2', 'touchcancel 2']
                 },
                 this.endMotion.bind(this, panInterpolator)
             );
 
-            manager.group(Groups.ORBIT_MANIPULATOR_TOUCH).addMappings(
+            manager.group(group).addMappings(
                 {
                     endRotate: ['touchend 1', 'touchcancel 1']
                 },
@@ -148,4 +149,5 @@ utils.createPrototypeObject(
         }
     })
 );
+
 export default OrbitManipulatorHammerController;

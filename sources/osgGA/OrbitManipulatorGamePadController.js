@@ -1,7 +1,7 @@
 import Controller from 'osgGA/Controller';
 import utils from 'osg/utils';
 import { vec2 } from 'osg/glMatrix';
-import Groups from '../osgViewer/input/InputConstants';
+import Groups from 'osgViewer/input/InputConstants';
 
 var OrbitManipulatorGamePadController = function(manipulator) {
     Controller.call(this, manipulator);

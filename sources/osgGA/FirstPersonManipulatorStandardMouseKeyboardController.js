@@ -21,7 +21,6 @@ utils.createPrototypeObject(
                     startLookAt: 'mousedown',
                     lookAt: 'mousemove',
                     stopLookAt: ['mouseup', 'mouseout'],
-                    resetToHome: 'keydown space',
                     goForward: ['keydown w', 'keydown z', 'keydown ArrowUp'],
                     goBackward: ['keydown s', 'keydown ArrowDown'],
                     goLeft: ['keydown a', 'keydown q', 'keydown ArrowLeft'],
@@ -41,6 +40,13 @@ utils.createPrototypeObject(
                         'keyup ArrowRight'
                     ],
                     changeStepFactor: 'wheel'
+                },
+                this
+            );
+
+            manager.group(Groups.FPS_MANIPULATOR_RESETTOHOME).addMappings(
+                {
+                    resetToHome: 'keydown space'
                 },
                 this
             );

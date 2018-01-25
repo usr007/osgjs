@@ -13,11 +13,6 @@ import TransformEnums from 'osg/transformEnums';
 import utils from 'osg/utils';
 import Groups from 'osgViewer/input/InputConstants';
 
-// var getCanvasCoord = function(vec, e) {
-//     vec[0] = e.canvasX;
-//     vec[1] = e.canvasY;
-// };
-
 var HideCullCallback = function() {};
 HideCullCallback.prototype = {
     cull: function() {
@@ -116,7 +111,6 @@ var NodeGizmo = function(viewer) {
 
     this._viewer = viewer;
     this._canvas = viewer.getGraphicContext().canvas;
-    this._manipulator = viewer.getManipulator();
 
     this._rotateNode = new MatrixTransform();
     this._translateNode = new MatrixTransform();
@@ -697,7 +691,7 @@ utils.createPrototypeNode(
                     // normalize gizmo size relative to screen size
                     var proj = this._viewer.getCamera().getProjectionMatrix();
                     var scaleFov = this._canvas.clientWidth * 0.023 * proj[0];
-                    this._manipulator.getEyePosition(eye);
+                    this._viewer.getManipulator().getEyePosition(eye);
                     // while we are editing we don't normalize the gizmo
                     // it gives a better depth feedback, especially if we are editing a geometry that has
                     // a constant screen size (for example an icon)
