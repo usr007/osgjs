@@ -394,6 +394,13 @@ InputManager.prototype = {
         this._params[name] = value;
     },
 
+    cleanup: function(){
+        for (var i = 0; i < this._groups.length; i++) {
+            var group = this._groups[i];
+            group._setEnable(false);
+        }
+    },
+
     dumpGroups: function() {
         console.log(this._groups);
     },
