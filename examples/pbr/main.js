@@ -293,7 +293,7 @@
 
         loadZipFile: function(fileOrBlob, zipFileName) {
             var self = this;
-            return osgDB.FileHelper.unzipFile(fileOrBlob).then(function(filesMap) {
+            return osgDB.FileHelper.unzip(fileOrBlob).then(function(filesMap) {
                 var gltfFile;
                 var environmentFormat;
                 filesMap.forEach(function(value, path) {

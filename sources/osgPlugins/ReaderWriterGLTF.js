@@ -1,5 +1,4 @@
 import P from 'bluebird';
-import requestFile from 'osgDB/requestFile';
 import BoundingBox from 'osg/BoundingBox';
 import StateSet from 'osg/StateSet';
 import Input from 'osgDB/Input';
@@ -22,6 +21,7 @@ import Texture from 'osg/Texture';
 import MatrixTransform from 'osg/MatrixTransform';
 import BlendFunc from 'osg/BlendFunc';
 import CullFace from 'osg/CullFace';
+import Image from 'osg/Image';
 import DrawElements from 'osg/DrawElements';
 import primitiveSet from 'osg/primitiveSet';
 import BufferArray from 'osg/BufferArray';
@@ -524,7 +524,9 @@ ReaderWriterGLTF.prototype = {
             var url = window.decodeURI(image.uri);
             var promise = this.loadURI(url).then(
                 function(imageData) {
-                    this.osgjsImage = imageData;
+                    var osgjsImage = new Image();
+                    osgjsImage.setImage(imageData);
+                    this.osgjsImage = osgjsImage;
                 }.bind(image)
             );
             promises.push(promise);
@@ -934,29 +936,8 @@ ReaderWriterGLTF.prototype = {
             return base64ToArrayBuffer(uri);
         }
 
-        var ext = FileHelper.getExtension(uri);
-        var fileType = FileHelper.getTypeForExtension(ext);
-        var isImage = FileHelper.isImage(ext);
-        var url = this._localPath + uri;
-        var data = this._filesMap.get(uri);
-
-        if (isImage) {
-            if (data instanceof window.Blob) {
-                return FileHelper.createImageFromBlob(data, uri);
-            }
-            return this._inputReader.readImageURL(url, {
-                imageLoadingUsePromise: true
-            });
-        } else {
-            if (data instanceof window.Blob) {
-                return FileHelper.createArrayBufferFromBlob(data);
-            }
-            return this._inputReader.readBinaryArrayURL(url, {
-                fileType: fileType
-            });
-        }
-
-        return undefined;
+        if (this._filesMap.has(uri) ) return this._filesMap.get(uri);
+        return FileHelper.loadURI(uri);
     }),
 
     readNodeURL: function(url, options) {
@@ -974,16 +955,12 @@ ReaderWriterGLTF.prototype = {
         var index = url.lastIndexOf('/');
         this._localPath = index === -1 ? '' : url.substr(0, index + 1);
         // Else it is a usual XHR request
-        var filePromise = requestFile(url);
-        return filePromise.then(function(file) {
+        return FileHelper.loadURI(url).then(function(file) {
             return self.readJSON(file);
         });
     },
 
-    readJSON: P.method(function(glTFFile, url) {
-        var json = JSON.parse(glTFFile);
-        if (!json) return undefined;
-
+    readJSON: P.method(function(json, url) {
         this._gltfJSON = json;
 
         return P.all([this.loadBuffers(), this.loadImages()]).then(

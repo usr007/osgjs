@@ -22,22 +22,9 @@
 
     Environment.prototype = {
         loadPackage: function(urlOfFile) {
-            var file = urlOfFile;
             var self = this;
 
-            if (typeof urlOfFile === 'string') {
-                return osgDB
-                    .requestFile(urlOfFile, {
-                        responseType: 'blob'
-                    })
-                    .then(function(blob) {
-                        return osgDB.FileHelper.unzipFile(blob).then(function(filesMap) {
-                            return self.readZipContent(filesMap, urlOfFile);
-                        });
-                    });
-            }
-
-            return osgDB.FileHelper.unzipFile(file).then(function(filesMap) {
+            return osgDB.FileHelper.unzip(urlOfFile).then(function(filesMap) {
                 return self.readZipContent(filesMap, urlOfFile);
             });
         },
@@ -52,25 +39,15 @@
             var promises = [];
             filesMap.forEach(
                 function(data, filename) {
-                    var ext = osgDB.FileHelper.getExtension(filename);
                     var name = filename.split('/').pop();
-
-                    if (ext === 'bin' || ext === 'gz') {
-                        var promise = osgDB.FileHelper.createArrayBufferFromBlob(data);
-                        promise.then(
-                            function(arrayBuffer) {
-                                this._files[name] = arrayBuffer;
-                            }.bind(this)
-                        );
-                        promises.push(promise);
-                    } else if (ext === 'json') {
-                        this._files[name] = JSON.parse(data);
-                    }
+                    this._files[name] = data;
                 }.bind(this)
             );
-            return P.all(promises).then(function() {
-                return this.init(null, this._files['config.json']);
-            }.bind(this));
+            return P.all(promises).then(
+                function() {
+                    return this.init(null, this._files['config.json']);
+                }.bind(this)
+            );
         },
 
         getImage: function(type, encoding, format) {

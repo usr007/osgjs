@@ -5,6 +5,10 @@ import Registry from 'osgDB/Registry';
 import requestFile from 'osgDB/requestFile.js';
 import notify from 'osg/notify';
 
+var isString = function(str) {
+    return typeof str === 'string' || str instanceof String;
+};
+
 var zip = window.zip;
 
 var typesMap = new window.Map();
@@ -61,20 +65,9 @@ var createJSONFromURL = function(url) {
     });
 };
 
-var imageResolver = {
-    blob: createImageFromBlob,
-    url: createImageFromURL
-};
-
-var JSONResolver = {
-    string: function(str) {
-        return P.resolve(JSON.parse(str));
-    }
-};
-
-var arrayBufferResolver = {
-    blob: createArrayBufferFromBlob,
-    url: createArrayBufferFromURL
+var createJSONFromString = function(str) {
+    var obj = JSON.parse(str);
+    return P.resolve(obj);
 };
 
 var FileHelper = {
@@ -84,32 +77,59 @@ var FileHelper = {
     createImageFromBlob: createImageFromBlob,
     createImageFromURL: createImageFromURL,
 
+    loadURI: function(uri) {
+        var extension = FileHelper.getExtension(uri);
+        var mimetype = FileHelper.getMimeType(extension);
+        if (mimetype.match('image')) return createImageFromURL(uri);
+        else if (mimetype.match('octet-binary')) return createArrayBufferFromURL(uri);
+        else if (mimetype.match('json')) return createJSONFromURL(uri);
+        else if (mimetype.match('text')) return requestFile(uri);
+        return P.reject('Unknown file type');
+    },
+
+    //     file.png :  url          -> fetch/createImage            ->   Image
+    //     file.png :  blob         -> createImage                  ->   Image
+    //     file.png :  Image        -> passthroug                   ->   Image
+    //     file.txt :  blob         -> FileReader                   ->   String
+    //     file.txt :  string       -> passthroug                   ->   String
+    //     file.txt :  url          -> fetch                        ->   String
+    //     file.json:  string       -> JSON.parse                   ->   Object
+    //     file.json:  url          -> fetch/JSON.parse             ->   Object
+    //     file.json:  blob         -> FileReader/JSON.parse        ->   Object
+    //     file.bin :  blob         -> FileReader/readAsArrayBuffer ->   arrayBuffer
+    //     file.bin :  url          -> fetch as arra yBuffer        ->   arrayBuffer
+    //     file.bin :  arrayBuffer  -> passthroug                   ->   arrayBuffer
+    resolveData: function(uri, data) {
+        var extension = FileHelper.getExtension(uri);
+        var mimetype = FileHelper.getMimeType(extension);
+
+        var createData;
+        if (mimetype.match('image')) {
+            if (isString(data)) createData = createImageFromURL;
+            else if (data instanceof window.Blob) createData = createImageFromBlob;
+        } else if (mimetype.match('json')) {
+            createData = createJSONFromString;
+        } else if (mimetype.match('octet-binary')) {
+            if (isString(data)) createData = createArrayBufferFromURL;
+            else if (data instanceof window.Blob) createData = createArrayBufferFromBlob;
+        }
+
+        var promise;
+        if (createData) {
+            promise = createData(data);
+        } else {
+            promise = P.resolve(data);
+        }
+        return promise;
+    },
+
     resolveFilesMap: function(filesMap) {
         var promises = [];
 
         filesMap.forEach(function(data, filename) {
-            var extension = FileHelper.getExtension(filename);
-            var mimetype = FileHelper.getMimeType(extension);
-
-            var createData;
-            if (mimetype.match('image')) {
-                if (data instanceof String) createData = imageResolver.url;
-                else if (data instanceof window.Blob) createData = imageResolver.blob;
-            } else if (mimetype.match('json')) {
-                createData = JSONResolver.string;
-            } else if (mimetype.match('octet-binary')) {
-                if (data instanceof String) createData = arrayBufferResolver.url;
-                else if (data instanceof window.Blob) createData = arrayBufferResolver.blob;
-            }
-
-            var promise;
-            if (createData) {
-                promise = createData(data).then(function(dataResolved) {
-                    filesMap[filesMap] = dataResolved;
-                });
-            } else {
-                promise = P.resolve(data);
-            }
+            var promise = FileHelper.resolveData(filename, data).then(function(dataResolved) {
+                filesMap.set(filename, dataResolved);
+            });
             promises.push(promise);
         });
 
@@ -138,7 +158,7 @@ var FileHelper = {
     unzipBlob: function(blob) {
         return new P(function(resolve, reject) {
             // use a zip.BlobReader object to read zipped data stored into blob variable
-            var content = new window.Map();
+            var filesMap = new window.Map();
             var filePromises = [];
             zip.createReader(
                 new zip.BlobReader(blob),
@@ -150,15 +170,16 @@ var FileHelper = {
 
                             var promise = FileHelper._unzipEntry(entries[i]);
                             promise.then(function(result) {
-                                content.set(result.filename, result.data);
+                                filesMap.set(result.filename, result.data);
                             });
                             filePromises.push(promise);
                         }
 
                         P.all(filePromises).then(function() {
                             zipReader.close();
-                            return resolve(content);
-                            //return FileHelper.resolveFilesMap(content);
+                            FileHelper.resolveFilesMap(filesMap).then(function() {
+                                resolve(filesMap);
+                            });
                         });
                     });
                 },
@@ -169,8 +190,19 @@ var FileHelper = {
         });
     },
 
-    unzipFile: function(blob) {
-        return FileHelper.unzipBlob(blob);
+    unzip: function(input) {
+        if (isString(input)) {
+            return FileHelper.loadURI(input).then(function(arrayBuffer) {
+                var blob = new window.Blob([arrayBuffer], {type: mimeTypes.get('zip')});
+                return FileHelper.unzipBlob(blob);
+            });
+        } else if (input instanceof window.Blob) {
+            return FileHelper.unzipBlob(input);
+        } else if (input instanceof window.ArrayBuffer) {
+            var blob = new window.Blob([input], {type: mimeTypes.get('zip')});
+            return FileHelper.unzipBlob(blob);
+        }
+        return P.reject('cant unzip input');
     },
 
     readFileList: function(fileList) {
@@ -188,7 +220,12 @@ var FileHelper = {
                 fileName = fileList[i].name;
             }
 
-            var type = FileHelper.getTypeForExtension(ext);
+            var mimeType = FileHelper.getMimeType(ext);
+            var type;
+            if (mimeType.match('image')) type = 'blob';
+            else if (mimeType.match('json') || mimeType.match('text')) type = 'string';
+            else type = 'ArrayBuffer';
+
             promiseArray.push(
                 requestFile(fileList[i], {
                     responseType: type
@@ -196,19 +233,20 @@ var FileHelper = {
             );
         }
 
-        return P.all(promiseArray).then(function(files) {
-            for (i = 0; i < files.length; ++i) {
-                filesMap.set(fileList[i].name, files[i]);
-            }
-
-            return readerParser.readNodeURL(fileName, {
-                filesMap: filesMap
+        return P.all(promiseArray)
+            .then(function(files) {
+                for (i = 0; i < files.length; ++i) {
+                    filesMap.set(fileList[i].name, files[i]);
+                }
+                return filesMap;
+            })
+            .then(function(files) {
+                return FileHelper.resolveFilesMap(files).then(function(filesMapResolved) {
+                    return readerParser.readNodeURL(fileName, {
+                        filesMap: filesMapResolved
+                    });
+                });
             });
-        });
-    },
-
-    isImage: function(extension) {
-        return mimeTypes.get(extension).match('image') !== null;
     },
 
     getMimeType: function(extension) {
@@ -219,16 +257,13 @@ var FileHelper = {
         return url.substr(url.lastIndexOf('.') + 1);
     },
 
-    // To add user defined types
-    addTypeForExtension: function(type, extension) {
-        if (typesMap.get(extension) !== undefined) {
-            notify.warn("the '" + extension + "' already has a type");
+    addMimeTypeForExtension: function(extension, mimeType) {
+        if (mimeTypes.has(extension) !== undefined) {
+            notify.warn(
+                "the '" + extension + "' already has a mimetype: " + mimeTypes.get(extension)
+            );
         }
-        typesMap.set(extension, type);
-    },
-
-    getTypeForExtension: function(extension) {
-        return typesMap.get(extension);
+        mimeTypes.set(extension, mimeType);
     }
 };
 
@@ -260,8 +295,8 @@ mimeTypes.set('jpeg', 'image/jpeg');
 mimeTypes.set('gif', 'image/gif');
 // Text
 mimeTypes.set('json', 'application/json');
-mimeTypes.set('gltf', 'text/plain');
-mimeTypes.set('osgjs', 'text/plain');
+mimeTypes.set('gltf', 'application/json');
+mimeTypes.set('osgjs', 'application/json');
 mimeTypes.set('txt', 'text/plain');
 
 export default FileHelper;
