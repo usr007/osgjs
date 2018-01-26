@@ -11,7 +11,6 @@ var isString = function(str) {
 
 var zip = window.zip;
 
-var typesMap = new window.Map();
 var mimeTypes = new window.Map();
 
 var createImageFromURL = function(url) {
@@ -81,7 +80,7 @@ var FileHelper = {
         var extension = FileHelper.getExtension(uri);
         var mimetype = FileHelper.getMimeType(extension);
         if (mimetype.match('image')) return createImageFromURL(uri);
-        else if (mimetype.match('octet-binary')) return createArrayBufferFromURL(uri);
+        else if (mimetype.match('binary')) return createArrayBufferFromURL(uri);
         else if (mimetype.match('json')) return createJSONFromURL(uri);
         else if (mimetype.match('text')) return requestFile(uri);
         return P.reject('Unknown file type');
@@ -109,7 +108,7 @@ var FileHelper = {
             else if (data instanceof window.Blob) createData = createImageFromBlob;
         } else if (mimetype.match('json')) {
             createData = createJSONFromString;
-        } else if (mimetype.match('octet-binary')) {
+        } else if (mimetype.match('binary')) {
             if (isString(data)) createData = createArrayBufferFromURL;
             else if (data instanceof window.Blob) createData = createArrayBufferFromBlob;
         }
@@ -133,7 +132,9 @@ var FileHelper = {
             promises.push(promise);
         });
 
-        return P.all(promises);
+        return P.all(promises).then(function() {
+            return filesMap;
+        });
     },
 
     _unzipEntry: function(entry) {
@@ -177,8 +178,8 @@ var FileHelper = {
 
                         P.all(filePromises).then(function() {
                             zipReader.close();
-                            FileHelper.resolveFilesMap(filesMap).then(function() {
-                                resolve(filesMap);
+                            FileHelper.resolveFilesMap(filesMap).then(function(filesMapResolved) {
+                                resolve(filesMapResolved);
                             });
                         });
                     });
@@ -224,7 +225,7 @@ var FileHelper = {
             var type;
             if (mimeType.match('image')) type = 'blob';
             else if (mimeType.match('json') || mimeType.match('text')) type = 'string';
-            else type = 'ArrayBuffer';
+            else type = 'arraybuffer';
 
             promiseArray.push(
                 requestFile(fileList[i], {
@@ -233,20 +234,16 @@ var FileHelper = {
             );
         }
 
-        return P.all(promiseArray)
-            .then(function(files) {
-                for (i = 0; i < files.length; ++i) {
-                    filesMap.set(fileList[i].name, files[i]);
-                }
-                return filesMap;
-            })
-            .then(function(files) {
-                return FileHelper.resolveFilesMap(files).then(function(filesMapResolved) {
-                    return readerParser.readNodeURL(fileName, {
-                        filesMap: filesMapResolved
-                    });
+        return P.all(promiseArray).then(function(files) {
+            for (i = 0; i < files.length; ++i) {
+                filesMap.set(fileList[i].name, files[i]);
+            }
+            return FileHelper.resolveFilesMap(filesMap).then(function(filesMapResolved) {
+                return readerParser.readNodeURL(fileName, {
+                    filesMap: filesMapResolved
                 });
             });
+        });
     },
 
     getMimeType: function(extension) {
@@ -266,22 +263,6 @@ var FileHelper = {
         mimeTypes.set(extension, mimeType);
     }
 };
-
-// Binary
-typesMap.set('bin', 'arraybuffer');
-typesMap.set('b3dm', 'arraybuffer');
-typesMap.set('glb', 'arraybuffer');
-typesMap.set('zip', 'arraybuffer');
-// Image
-typesMap.set('png', 'blob');
-typesMap.set('jpg', 'blob');
-typesMap.set('jpeg', 'blob');
-typesMap.set('gif', 'blob');
-// Text
-typesMap.set('json', 'string');
-typesMap.set('gltf', 'string');
-typesMap.set('osgjs', 'string');
-typesMap.set('txt', 'string');
 
 mimeTypes.set('bin', 'application/octet-binary');
 mimeTypes.set('b3dm', 'application/octet-binary');

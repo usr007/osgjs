@@ -936,7 +936,7 @@ ReaderWriterGLTF.prototype = {
             return base64ToArrayBuffer(uri);
         }
 
-        if (this._filesMap.has(uri) ) return this._filesMap.get(uri);
+        if (this._filesMap.has(uri)) return this._filesMap.get(uri);
         return FileHelper.loadURI(uri);
     }),
 
