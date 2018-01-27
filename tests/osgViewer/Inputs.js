@@ -59,7 +59,8 @@ export default function() {
                 shiftKey: true,
                 ctrlKey: true,
                 metaKey: false,
-                altKey: false
+                altKey: false,
+                preventDefault: function() {}
             };
             assert(keyboard.matches(event, parsedEvent), 'Event should match');
 
@@ -72,7 +73,8 @@ export default function() {
                 shiftKey: false,
                 ctrlKey: true,
                 metaKey: false,
-                altKey: false
+                altKey: false,
+                preventDefault: function() {}
             };
             assert(mouse.matches(event, parsedEvent), 'Event should match');
         })();

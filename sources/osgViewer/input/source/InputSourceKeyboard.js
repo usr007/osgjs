@@ -45,24 +45,19 @@ utils.createPrototypeObject(
             }
             if (nativeEvent.key.toLowerCase() !== parsedEvent.action) {
                 if (nativeEvent.code.toLowerCase() !== parsedEvent.action) {
-                    //   console.log('no match', nativeEvent.key, nativeEvent.code, parsedEvent.action);
                     return false;
                 }
             }
-            if (nativeEvent.ctrlKey !== !!parsedEvent.ctrl) {
-                //console.log('ctrl no match');
+            if (parsedEvent.ctrl !== undefined && nativeEvent.ctrlKey !== parsedEvent.ctrl) {
                 return false;
             }
-            if (nativeEvent.shiftKey !== !!parsedEvent.shift) {
-                //console.log('shift no match');
+            if (parsedEvent.shift !== undefined && nativeEvent.shiftKey !== parsedEvent.shift) {
                 return false;
             }
-            if (nativeEvent.altKey !== !!parsedEvent.alt) {
-                //console.log('alt no match');
+            if (parsedEvent.alt !== undefined && nativeEvent.altKey !== parsedEvent.alt) {
                 return false;
             }
-            if (nativeEvent.metaKey !== !!parsedEvent.meta) {
-                //console.log('meta no match');
+            if (parsedEvent.meta !== undefined && nativeEvent.metaKey !== parsedEvent.meta) {
                 return false;
             }
 

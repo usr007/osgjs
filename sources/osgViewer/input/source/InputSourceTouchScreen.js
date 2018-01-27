@@ -1,6 +1,7 @@
 import utils from 'osg/utils';
 import InputSource from 'osgViewer/input/source/InputSource';
 import Hammer from 'hammer';
+import { vec2 } from 'osg/glMatrix';
 
 /**
  * Handles standard touch events and advanced touch events through Hammer.js
@@ -10,6 +11,7 @@ import Hammer from 'hammer';
  */
 var InputSourceTouchScreen = function(canvas) {
     InputSource.call(this, canvas);
+    this._defaultRatio = vec2.fromValues(1.0, 1.0);
 
     this._hammerEvents = [
         'pan',
@@ -145,9 +147,9 @@ utils.createPrototypeObject(
 
             // x, y coordinates in the gl viewport
             var ratio = this._inputManager.getParam('pixelRatio');
-            if (!ratio) ratio = 1.0;
-            customEvent.glX = customEvent.canvasX * ratio;
-            customEvent.glY = (this._target.clientHeight - customEvent.canvasY) * ratio;
+            if (!ratio) ratio = this._defaultRatio;
+            customEvent.glX = customEvent.canvasX * ratio[0];
+            customEvent.glY = (this._target.clientHeight - customEvent.canvasY) * ratio[1];
         },
 
         _isNativeEvent: function(evt) {
@@ -155,6 +157,7 @@ utils.createPrototypeObject(
         },
 
         matches: function(nativeEvent, parsedEvent) {
+            nativeEvent.preventDefault();
             if (nativeEvent.pointerType && nativeEvent.pointerType !== 'touch') {
                 return false;
             }

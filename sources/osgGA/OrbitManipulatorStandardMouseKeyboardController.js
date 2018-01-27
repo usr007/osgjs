@@ -45,7 +45,7 @@ utils.createPrototypeObject(
                     motion: 'mousemove',
                     startPan: ['mousedown shift 0', 'mousedown 1', 'mousedown 2'],
                     startZoom: ['mousedown ctrl 0', 'mousedown ctrl 2'],
-                    startRotate: 'mousedown 0',
+                    startRotate: 'mousedown 0 !shift !ctrl',
                     stopMotion: ['mouseup', 'mouseout', 'keyup a', 'keyup s', 'keyup d'],
                     zoom: 'wheel'
                 },

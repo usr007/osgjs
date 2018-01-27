@@ -28,6 +28,12 @@ var InputGroup = function(inputManager, name) {
 
     // the callback to collect native events bound to this instance
     this._boundCallback = this._collectNativeEvents.bind(this);
+
+    // the group priority (the highest priorities of the events of this group)
+    this._priority = DEFAULT_PRIORITY;
+
+    // true when the group has at least one source (used only or debug)
+    this._hasSources = false;
 };
 
 InputGroup.prototype = {
@@ -35,7 +41,7 @@ InputGroup.prototype = {
         if (!this._enabled || this._mask.length) {
             return;
         }
-        nativeEvent.preventDefault();
+        //nativeEvent.preventDefault();
         var events = this._mappings[nativeEvent.type];
         if (!events) {
             return;
@@ -63,26 +69,36 @@ InputGroup.prototype = {
     },
 
     _addEvent: function(nativeEvent, eventName) {
-        // creating an event instance for each eventName / nativeEvent combination.
-        var event = new Event(this._name + ':' + eventName);
-        event._parsedEvent = nativeEvent;
-        event._priority = DEFAULT_PRIORITY;
+        // creating an event instance for each eventName / raw nativeEvent  combination.
+        var fullName = this._name + ':' + eventName;
 
-        // adding the new event to the events map
-        var eventList = this._events[eventName];
-        if (!eventList) {
-            eventList = [];
-        }
-        eventList.push(event);
-        this._events[eventName] = eventList;
-
-        // adding the new event to the mappings map
+        // find or init the mapping native event/events instance for this native event
         var events = this._mappings[nativeEvent.name];
+        var event;
         if (!events) {
             events = [];
             this._mappings[nativeEvent.name] = events;
+        } else {
+            // try to find an existing event that matches the new one
+            event = this._findEvent(events, fullName, nativeEvent.raw);
         }
-        events.push(event);
+
+        // find or init the mapping eventName/events instance for this eventName
+        var eventList = this._events[eventName];
+        if (!eventList) {
+            eventList = [];
+            this._events[eventName] = eventList;
+        }
+
+        if (!event) {
+            // event not found let's create a new one and add it to the maps
+            event = new Event(fullName);
+            events.push(event);
+            eventList.push(event);
+        }
+
+        event._parsedEvent = nativeEvent;
+        event._priority = DEFAULT_PRIORITY;
 
         // finding the source of the native event and enable the dispatch
         var source = this._inputManager._getSource(nativeEvent.name);
@@ -90,8 +106,19 @@ InputGroup.prototype = {
             if (this._enabled) {
                 source.setEnable(nativeEvent.name, this._boundCallback, true);
             }
+            this._hasSources = true;
             event._source = source;
         }
+    },
+
+    _findEvent: function(list, name, nativeRaw) {
+        for (var i = 0; i < list.length; i++) {
+            var evt = list[i];
+            if (evt.type === name && evt._parsedEvent.raw === nativeRaw) {
+                return event;
+            }
+        }
+        return undefined;
     },
 
     addMappings: function(mappings, listener) {
@@ -110,6 +137,9 @@ InputGroup.prototype = {
             var events = this._mappings[nativeEvent];
             for (var i = 0; i < events.length; i++) {
                 var evt = events[i];
+                if (!evt._source) {
+                    continue;
+                }
                 evt._source.setEnable(nativeEvent, this._boundCallback, enable);
             }
         }
@@ -141,6 +171,11 @@ var InputManager = function() {
 
     // Custom parameters
     this._params = {};
+
+    this._maskedGroups = [];
+
+    window.dumpInputGroups = this.dumpGroups.bind(this);
+    window.dumpEventSequence = this.dumpEventSequence.bind(this);
 };
 
 InputManager.prototype = {
@@ -204,8 +239,13 @@ InputManager.prototype = {
         var i;
         for (i = 1; i < tokens.length; i++) {
             var token = tokens[i];
+            var value = true;
+            if (token.indexOf('!') === 0) {
+                value = false;
+                token = token.substring(1, token.length);
+            }
             if (MODIFIERS.indexOf(token) >= 0) {
-                parsedEvent[token] = true;
+                parsedEvent[token] = value;
             } else {
                 parsedEvent.action = token.toLowerCase();
             }
@@ -222,11 +262,13 @@ InputManager.prototype = {
             }
         }
 
-        if (!parsedEvent.action && tokens.length > 1) {
-            // user wants one of the modifier keys to be the action
-            // we take the lase one
+        if (parsedEvent.name.indexOf('key') === 0 && !parsedEvent.action && tokens.length > 1) {
+            // Key down event, the user wants one of the modifier keys to be the action
+            // we take the last one
             parsedEvent.action = tokens[tokens.length - 1];
         }
+
+        parsedEvent.raw = event;
 
         return parsedEvent;
     },
@@ -250,6 +292,13 @@ InputManager.prototype = {
         if (!group) {
             group = new InputGroup(this, name);
             this._groups[name] = group;
+            //check if the group should be masked
+            for (var i = 0; i < this._maskedGroups.length; i++) {
+                var mask = this._maskedGroups[i];
+                if (name.indexOf(mask) === 0) {
+                    group._mask.push(mask);
+                }
+            }
         }
         return group;
     },
@@ -258,7 +307,6 @@ InputManager.prototype = {
         var group = this._groups[groupName];
         if (group) {
             group._setEnable(enable);
-            return;
         }
 
         var index;
@@ -271,12 +319,14 @@ InputManager.prototype = {
                 index = group._mask.indexOf(groupName);
                 if (index >= 0) {
                     group._mask.splice(index, 1);
+                    this._maskedGroups.splice(this._maskedGroups.indexOf(groupName), 1);
                 }
             } else {
                 // add the group to the mask
                 index = group._name.indexOf(groupName);
                 if (index === 0 && group._name[index + groupName.length] === '.') {
                     group._mask.push(groupName);
+                    this._maskedGroups.push(groupName);
                 }
             }
         }
@@ -308,30 +358,34 @@ InputManager.prototype = {
      */
     setPriority: function(eventName, priority) {
         var groupEvent = eventName.split(':');
-
-        var group = this._groups[groupEvent[0]];
-        if (!group) {
-            console.warn("Couldn't find input group named " + groupEvent[0]);
-            return;
-        }
         if (priority < 0) {
             throw 'priority must be a positive number';
         }
+        var group = this._groups[groupEvent[0]];
+
         var event, eventList, i;
-        if (groupEvent[1]) {
+        if (group && groupEvent[1]) {
             // setPriority on a specific event
             eventList = group._events[groupEvent[1]];
             for (i = 0; i < eventList.length; i++) {
                 event = eventList[i];
                 event._priority = priority;
             }
+            if (group._priority > priority) {
+                group._priority = priority;
+            }
         } else {
             // set Priority on a group, setting priority on all group's events.
-            for (var key in group._events) {
-                eventList = group._events[key];
-                for (i = 0; i < eventList.length; i++) {
-                    event = eventList[i];
-                    event._priority = priority;
+            for (var key in this._groups) {
+                group = this._groups[key];
+                if (group._name.indexOf(eventName) >= 0) {
+                    for (var evt in group._events) {
+                        eventList = group._events[evt];
+                        for (i = 0; i < eventList.length; i++) {
+                            event = eventList[i];
+                            event._priority = priority;
+                        }
+                    }
                 }
             }
         }
@@ -394,21 +448,67 @@ InputManager.prototype = {
         this._params[name] = value;
     },
 
-    cleanup: function(){
+    cleanup: function() {
         for (var i = 0; i < this._groups.length; i++) {
             var group = this._groups[i];
             group._setEnable(false);
         }
     },
 
-    dumpGroups: function() {
-        console.log(this._groups);
+    dumpGroups: function(onlyEnabled) {
+        for (var groupName in this._groups) {
+            var group = this._groups[groupName];
+            var enabled = group._enabled && !group._mask.length && group._hasSources;
+            if (onlyEnabled && !enabled) {
+                continue;
+            }
+            console.groupCollapsed(
+                '%c' + groupName + (enabled ? ' (enabled)' : ' (disabled)'),
+                enabled ? '' : 'color: #888888'
+            );
+
+            console.log('enabled:', group._enabled);
+            console.log('masks:', group._mask);
+            console.log('input sources:', group._hasSources);
+            console.group('events');
+            for (var evt in group._events) {
+                console.groupCollapsed(evt);
+                var events = group._events[evt];
+                for (var i = 0; i < events.length; i++) {
+                    var event = events[i];
+                    var str =
+                        '%c' +
+                        event._parsedEvent.raw +
+                        ' (' +
+                        (event._source ? event._source.getName() : 'unknown source') +
+                        ')';
+                    var color = event._source ? '' : 'color: #888888';
+                    console.log(str, color);
+                }
+                console.groupCollapsed('function');
+                console.log(this._callbacks[group._name + ':' + evt]);
+                console.groupEnd();
+                console.groupEnd();
+            }
+
+            console.groupEnd();
+            console.groupEnd();
+        }
     },
 
-    dumpEventSequence: function() {
+    dumpEventSequence: function(filter, onlyEnabled) {
         var eventList = [];
+        if (filter === true) {
+            onlyEnabled = filter;
+            filter = undefined;
+        }
+        var enabled;
         for (var groupKey in this._groups) {
             var group = this._groups[groupKey];
+            enabled = group._enabled && !group._mask.length && group._hasSources;
+            if (onlyEnabled && !enabled) {
+                continue;
+            }
             for (var eventKey in group._events) {
                 var events = group._events[eventKey];
                 var list = eventList[events[0]._priority];
@@ -416,10 +516,51 @@ InputManager.prototype = {
                     list = [];
                     eventList[events[0]._priority] = list;
                 }
-                list.push(events[0]);
+                for (var i = 0; i < events.length; i++) {
+                    var ev = events[i];
+                    if (!filter || (filter && ev._parsedEvent.raw.indexOf(filter) >= 0)) {
+                        list.push({
+                            name: ev.type,
+                            group: group._name,
+                            on: ev._parsedEvent.raw,
+                            enabled: group._enabled && !group._mask.length && !!ev._source,
+                            source: ev._source
+                                ? '(' + ev._source.getName() + ')'
+                                : '(unknown source)'
+                        });
+                    }
+                }
             }
         }
-        console.log(eventList);
+
+        for (var j = 0; j < eventList.length; j++) {
+            var evts = eventList[j];
+            if (evts) {
+                console.group('priority ' + j);
+                var prevEvt;
+                for (var k = 0; k < evts.length; k++) {
+                    var evt = evts[k];
+                    if (k !== 0 && prevEvt !== evt.name) {
+                        console.groupEnd();
+                    }
+                    if (prevEvt !== evt.name) {
+                        var grp = this._groups[evt.group];
+                        enabled = grp._enabled && !grp._mask.length && grp._hasSources;
+                        console.groupCollapsed('%c' + evt.name, enabled ? '' : 'color:#888888');
+                    }
+                    prevEvt = evt.name;
+                    console.groupCollapsed(
+                        '%c' + evt.on + ' ' + evt.source,
+                        evt.enabled ? '' : 'color:#888888'
+                    );
+                    console.log(this._callbacks[evt.name]);
+                    console.groupEnd();
+                }
+                console.groupEnd();
+                console.groupEnd();
+            }
+        }
+        //console.log(eventList);
     }
 };
 

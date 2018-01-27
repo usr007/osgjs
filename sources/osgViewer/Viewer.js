@@ -62,33 +62,30 @@ var Viewer = function(canvas, userOptions, error) {
 utils.createPrototypeObject(
     Viewer,
     utils.objectInherit(View.prototype, {
-
         initInputManager: function(options, canvas) {
-            //Maybe offer a better way to tweak this...
-            if (options.inputManager) {
-                this._inputManager = options.inputManager;
-                return;
-            }
-
             var inputManager = new InputManager();
+            this._inputManager = inputManager;
 
             //Default mouse and keyboard
-            inputManager.registerInputSource(new InputSourceMouse(canvas));
-            inputManager.registerInputSource(new InputSourceKeyboard(document));
+            this._initInputSource(InputSourceMouse, 'Mouse', canvas, options);
+            this._initInputSource(InputSourceKeyboard, 'Keyboard', document, options);
 
             // touch inputs, Only activate them if we have a touch device in order to fix problems with IE11
             if ('ontouchstart' in window) {
-                inputManager.registerInputSource(new InputSourceTouchScreen(canvas));
+                this._initInputSource(InputSourceTouchScreen, 'TouchScreen', canvas, options);
             }
 
-            inputManager.registerInputSource(new InputSourceWebVR());
-            inputManager.registerInputSource(new InputSourceDeviceOrientation());
+            this._initInputSource(InputSourceWebVR, 'WebVR', undefined, options);
+            this._initInputSource(
+                InputSourceDeviceOrientation,
+                'DeviceOrientation',
+                undefined,
+                options
+            );
 
             if (navigator.getGamepads) {
-                inputManager.registerInputSource(new InputSourceGamePad());
+                this._initInputSource(InputSourceGamePad, 'GamePad', undefined, options);
             }
-
-            this._inputManager = inputManager;
 
             inputManager.addMappings(
                 { 'viewer.internals:hmdConnect': 'vrdisplayconnected' },
@@ -97,7 +94,19 @@ utils.createPrototypeObject(
                 }.bind(this)
             );
 
-            inputManager.setParam('pixelRatio', this._devicePixelRatio);
+            inputManager.setParam('pixelRatio', [this._devicePixelRatio, this._devicePixelRatio]);
+        },
+
+        _initInputSource: function(sourceClass, optionName, defaultSrcElem, options) {
+            var opt = options.InputSources ? options.InputSources[optionName] : undefined;
+            if (opt) {
+                if (opt.enable !== false) {
+                    var elem = opt.sourceElement || defaultSrcElem;
+                    this._inputManager.registerInputSource(new sourceClass(elem));
+                }
+            } else {
+                this._inputManager.registerInputSource(new sourceClass(defaultSrcElem));
+            }
         },
 
         getInputManager: function() {
@@ -562,8 +571,7 @@ utils.createPrototypeObject(
         setEnableManipulator: function(bool) {
             if (!this._manipulator) return;
             this._manipulator.setEnable(bool);
-        },
-
+        }
     }),
     'osgViewer',
     'Viewer'

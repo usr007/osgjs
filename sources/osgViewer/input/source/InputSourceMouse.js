@@ -1,5 +1,6 @@
 import utils from 'osg/utils';
 import InputSource from 'osgViewer/input/source/InputSource';
+import { vec2 } from 'osg/glMatrix';
 
 /**
  * Standard Mouse Event handled directly on the canvas.
@@ -8,6 +9,8 @@ import InputSource from 'osgViewer/input/source/InputSource';
  */
 var InputSourceMouse = function(canvas) {
     InputSource.call(this, canvas);
+    this._defaultRatio = vec2.fromValues(1.0, 1.0);
+
     this._supportedEvents = [
         'click',
         'contextmenu',
@@ -58,9 +61,9 @@ utils.createPrototypeObject(
 
             // x, y coordinates in the gl viewport
             var ratio = this._inputManager.getParam('pixelRatio');
-            if (!ratio) ratio = 1.0;
-            customEvent.glX = customEvent.canvasX * ratio;
-            customEvent.glY = (this._target.clientHeight - customEvent.canvasY) * ratio;
+            if (!ratio) ratio = this._defaultRatio;
+            customEvent.glX = customEvent.canvasX * ratio[0];
+            customEvent.glY = (this._target.clientHeight - customEvent.canvasY) * ratio[1];
 
             customEvent.clientX = ev.clientX;
             customEvent.clientY = ev.clientY;
@@ -106,26 +109,20 @@ utils.createPrototypeObject(
         },
 
         matches: function(nativeEvent, parsedEvent) {
-            if (!parsedEvent.action) {
-                return true;
-            }
-            if (nativeEvent.button !== parseInt(parsedEvent.action)) {
+            nativeEvent.preventDefault();
+            if (parsedEvent.action && nativeEvent.button !== parseInt(parsedEvent.action)) {
                 return false;
             }
-            if (nativeEvent.ctrlKey !== !!parsedEvent.ctrl) {
-                //console.log('ctrl no match');
+            if (parsedEvent.ctrl !== undefined && nativeEvent.ctrlKey !== parsedEvent.ctrl) {
                 return false;
             }
-            if (nativeEvent.shiftKey !== !!parsedEvent.shift) {
-                //console.log('shift no match');
+            if (parsedEvent.shift !== undefined && nativeEvent.shiftKey !== parsedEvent.shift) {
                 return false;
             }
-            if (nativeEvent.altKey !== !!parsedEvent.alt) {
-                //console.log('alt no match');
+            if (parsedEvent.alt !== undefined && nativeEvent.altKey !== parsedEvent.alt) {
                 return false;
             }
-            if (nativeEvent.metaKey !== !!parsedEvent.meta) {
-                //console.log('meta no match');
+            if (parsedEvent.meta !== undefined && nativeEvent.metaKey !== parsedEvent.meta) {
                 return false;
             }
 
